@@ -7,6 +7,8 @@ use App\Exceptions\PaymentExceedsBalance;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Models\SukiPoint;
+use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 
 class LedgerService
@@ -18,26 +20,31 @@ class LedgerService
     {
         return DB::transaction(function () use ($customer, $attributes): LedgerEntry {
             $lockedCustomer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
-            $amount = (float) $attributes['amount'];
-            $projectedBalance = (float) $lockedCustomer->current_balance + $amount;
+            $amountInCents = Money::toCents($attributes['amount']);
 
-            if ($amount <= 0) {
+            if ($amountInCents === 0) {
                 throw new \InvalidArgumentException('A credit amount must be greater than zero.');
             }
 
-            if ($projectedBalance > (float) $lockedCustomer->credit_limit) {
-                throw new CreditLimitExceeded((float) $lockedCustomer->credit_limit, $projectedBalance);
+            $projectedBalanceInCents = Money::toCents($lockedCustomer->current_balance) + $amountInCents;
+            $creditLimitInCents = Money::toCents($lockedCustomer->credit_limit);
+
+            if ($projectedBalanceInCents > $creditLimitInCents) {
+                throw new CreditLimitExceeded(
+                    Money::fromCents($creditLimitInCents),
+                    Money::fromCents($projectedBalanceInCents),
+                );
             }
 
             $entry = $lockedCustomer->ledgerEntries()->create([
-                'amount' => $amount,
+                'amount' => Money::fromCents($amountInCents),
                 'itemized_list' => $attributes['itemized_list'] ?? null,
                 'transaction_date' => $attributes['transaction_date'] ?? now()->toDateString(),
                 'repayment_deadline' => $attributes['repayment_deadline'],
-                'running_balance' => $projectedBalance,
+                'running_balance' => Money::fromCents($projectedBalanceInCents),
             ]);
 
-            $lockedCustomer->update(['current_balance' => $projectedBalance]);
+            $lockedCustomer->update(['current_balance' => Money::fromCents($projectedBalanceInCents)]);
 
             return $entry;
         });
@@ -48,27 +55,39 @@ class LedgerService
         return DB::transaction(function () use ($entry, $amount, $paymentDate): Payment {
             $lockedEntry = LedgerEntry::query()->lockForUpdate()->findOrFail($entry->id);
             $lockedCustomer = Customer::query()->lockForUpdate()->findOrFail($lockedEntry->customer_id);
-            $paymentAmount = (float) $amount;
-            $remainingBalance = (float) $lockedEntry->amount - (float) $lockedEntry->payments()->sum('amount');
+            $paymentAmountInCents = Money::toCents($amount);
 
-            if ($paymentAmount <= 0) {
+            if ($paymentAmountInCents === 0) {
                 throw new \InvalidArgumentException('A payment amount must be greater than zero.');
             }
 
-            if ($paymentAmount > $remainingBalance) {
-                throw new PaymentExceedsBalance($remainingBalance, $paymentAmount);
+            $remainingBalanceInCents = Money::toCents($lockedEntry->amount)
+                - Money::toCents((string) $lockedEntry->payments()->sum('amount'));
+
+            if ($paymentAmountInCents > $remainingBalanceInCents) {
+                throw new PaymentExceedsBalance(
+                    Money::fromCents($remainingBalanceInCents),
+                    Money::fromCents($paymentAmountInCents),
+                );
             }
 
             $payment = $lockedEntry->payments()->create([
                 'customer_id' => $lockedCustomer->id,
-                'amount' => $paymentAmount,
+                'amount' => Money::fromCents($paymentAmountInCents),
                 'payment_date' => $paymentDate ?? now()->toDateString(),
             ]);
 
-            $newCustomerBalance = max(0, (float) $lockedCustomer->current_balance - $paymentAmount);
-            $lockedCustomer->update(['current_balance' => $newCustomerBalance]);
+            $totalCreditsInCents = Money::toCents((string) $lockedCustomer->ledgerEntries()->sum('amount'));
+            $totalPaymentsInCents = Money::toCents((string) $lockedCustomer->payments()->sum('amount'));
+            $newCustomerBalanceInCents = $totalCreditsInCents - $totalPaymentsInCents;
+            $lockedCustomer->update(['current_balance' => Money::fromCents($newCustomerBalanceInCents)]);
 
-            if (abs($paymentAmount - $remainingBalance) < 0.005) {
+            $this->awardRepaymentPoints($lockedCustomer, $payment, $paymentAmountInCents);
+
+            $entryIsSettled = $paymentAmountInCents === $remainingBalanceInCents;
+            $customerHasNoOutstandingDebt = $newCustomerBalanceInCents === 0;
+
+            if ($entryIsSettled && $customerHasNoOutstandingDebt) {
                 $this->completeDebtCycle($lockedCustomer);
             }
 
@@ -81,15 +100,37 @@ class LedgerService
         $sukiPoints = $customer->sukiPoints()->firstOrCreate([
             'customer_id' => $customer->id,
         ]);
-
         $currentCycleCount = $sukiPoints->current_cycle_count + 1;
         $rewardEligible = $currentCycleCount >= $sukiPoints->reward_threshold;
 
         $sukiPoints->update([
             'completed_cycles' => $sukiPoints->completed_cycles + 1,
             'current_cycle_count' => $rewardEligible ? 0 : $currentCycleCount,
-            'points_balance' => $sukiPoints->points_balance + 1,
             'reward_eligible' => $rewardEligible,
+        ]);
+    }
+
+    private function awardRepaymentPoints(Customer $customer, Payment $payment, int $paymentAmountInCents): void
+    {
+        $sukiPoints = $customer->sukiPoints()->firstOrCreate([
+            'customer_id' => $customer->id,
+        ]);
+        $remainderBeforeCents = $sukiPoints->repayment_remainder_cents;
+        $repaymentTotalCents = $remainderBeforeCents + $paymentAmountInCents;
+        $pointsAwarded = intdiv($repaymentTotalCents, SukiPoint::CENTS_PER_POINT);
+        $remainderAfterCents = $repaymentTotalCents % SukiPoint::CENTS_PER_POINT;
+
+        $customer->sukiPointTransactions()->create([
+            'payment_id' => $payment->id,
+            'paid_amount_cents' => $paymentAmountInCents,
+            'points_awarded' => $pointsAwarded,
+            'remainder_before_cents' => $remainderBeforeCents,
+            'remainder_after_cents' => $remainderAfterCents,
+        ]);
+
+        $sukiPoints->update([
+            'points_balance' => $sukiPoints->points_balance + $pointsAwarded,
+            'repayment_remainder_cents' => $remainderAfterCents,
         ]);
     }
 }

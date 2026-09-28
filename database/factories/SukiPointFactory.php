@@ -24,6 +24,7 @@ class SukiPointFactory extends Factory
             'current_cycle_count' => 0,
             'reward_threshold' => 3,
             'points_balance' => 0,
+            'repayment_remainder_cents' => 0,
             'reward_eligible' => false,
         ];
     }
