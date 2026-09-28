@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Services\LedgerService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
@@ -17,11 +19,21 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->isProduction()) {
+            throw new RuntimeException('The demo seeder must not be run in production.');
+        }
+
+        $ownerPassword = config('app.demo_owner_password');
+
+        if (! is_string($ownerPassword) || $ownerPassword === '') {
+            throw new RuntimeException('Set DEMO_OWNER_PASSWORD in .env before running the demo seeder.');
+        }
+
         User::query()->updateOrCreate([
             'email' => 'owner@example.com',
         ], [
             'name' => 'Test User',
-            'password' => 'password',
+            'password' => $ownerPassword,
         ]);
 
         $ledgerService = app(LedgerService::class);
@@ -50,20 +62,29 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($scenarios as $scenario) {
-            $customer = Customer::create($scenario['customer']);
+            DB::transaction(function () use ($scenario, $ledgerService): void {
+                $customer = Customer::query()->firstOrCreate(
+                    ['contact_number' => $scenario['customer']['contact_number']],
+                    $scenario['customer'],
+                );
 
-            foreach ($scenario['entries'] as [$amount, $items, $deadlineDays, $paymentAmount]) {
-                $entry = $ledgerService->recordCredit($customer, [
-                    'amount' => $amount,
-                    'itemized_list' => $items,
-                    'transaction_date' => now()->subDays(max(0, -$deadlineDays + 5))->toDateString(),
-                    'repayment_deadline' => now()->addDays($deadlineDays)->toDateString(),
-                ]);
-
-                if ($paymentAmount > 0) {
-                    $ledgerService->recordPayment($entry, $paymentAmount, now()->subDays(2)->toDateString());
+                if ($customer->ledgerEntries()->exists()) {
+                    return;
                 }
-            }
+
+                foreach ($scenario['entries'] as [$amount, $items, $deadlineDays, $paymentAmount]) {
+                    $entry = $ledgerService->recordCredit($customer, [
+                        'amount' => $amount,
+                        'itemized_list' => $items,
+                        'transaction_date' => now()->subDays(max(0, -$deadlineDays + 5))->toDateString(),
+                        'repayment_deadline' => now()->addDays($deadlineDays)->toDateString(),
+                    ]);
+
+                    if ($paymentAmount > 0) {
+                        $ledgerService->recordPayment($entry, $paymentAmount, now()->subDays(2)->toDateString());
+                    }
+                }
+            });
         }
     }
 }

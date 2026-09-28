@@ -6,10 +6,10 @@ use RuntimeException;
 
 class CreditLimitExceeded extends RuntimeException
 {
-    public function __construct(float $creditLimit, float $projectedBalance)
+    public function __construct(string $creditLimit, string $projectedBalance)
     {
         parent::__construct(sprintf(
-            'This credit entry would exceed the customer credit limit of %.2f. Projected balance: %.2f.',
+            'This credit entry would exceed the customer credit limit of %s. Projected balance: %s.',
             $creditLimit,
             $projectedBalance,
         ));

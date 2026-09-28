@@ -43,4 +43,9 @@ class Customer extends Model
     {
         return $this->hasOne(SukiPoint::class);
     }
+
+    public function sukiPointTransactions(): HasMany
+    {
+        return $this->hasMany(SukiPointTransaction::class);
+    }
 }

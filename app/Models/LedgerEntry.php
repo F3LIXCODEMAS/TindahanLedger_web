@@ -2,12 +2,17 @@
 
 namespace App\Models;
 
+use App\Support\Money;
 use Database\Factories\LedgerEntryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $running_balance Customer balance immediately after this credit was recorded; later payments do not change this snapshot.
+ * @property-read string $outstanding_balance Amount still owed on this ledger entry after its payments.
+ */
 class LedgerEntry extends Model
 {
     /** @use HasFactory<LedgerEntryFactory> */
@@ -45,6 +50,9 @@ class LedgerEntry extends Model
 
     public function getOutstandingBalanceAttribute(): string
     {
-        return number_format((float) $this->amount - (float) $this->payments()->sum('amount'), 2, '.', '');
+        $amountInCents = Money::toCents($this->amount);
+        $paymentsInCents = Money::toCents((string) $this->payments()->sum('amount'));
+
+        return Money::fromCents($amountInCents - $paymentsInCents);
     }
 }
