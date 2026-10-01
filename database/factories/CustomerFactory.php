@@ -20,6 +20,7 @@ class CustomerFactory extends Factory
         return [
             'full_name' => fake()->name(),
             'contact_number' => fake()->numerify('09#########'),
+            'email' => fake()->unique()->userName().'@example.test',
             'residential_landmark' => fake()->streetName().' near '.fake()->city(),
             'credit_limit' => fake()->randomElement([3000, 5000, 8000, 10000]),
             'current_balance' => 0,

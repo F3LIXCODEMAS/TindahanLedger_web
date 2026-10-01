@@ -22,9 +22,11 @@ class LedgerEntry extends Model
         'customer_id',
         'amount',
         'itemized_list',
+        'note',
         'transaction_date',
         'repayment_deadline',
         'running_balance',
+        'idempotency_key',
     ];
 
     protected function casts(): array

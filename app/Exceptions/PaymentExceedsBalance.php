@@ -9,8 +9,7 @@ class PaymentExceedsBalance extends RuntimeException
     public function __construct(string $remainingBalance, string $paymentAmount)
     {
         parent::__construct(sprintf(
-            'The payment of %s exceeds the ledger entry balance of %s.',
-            $paymentAmount,
+            'Payment cannot exceed the customer outstanding balance of ₱%s.',
             $remainingBalance,
         ));
     }
