@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\CustomerFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,9 +14,17 @@ class Customer extends Model
     /** @use HasFactory<CustomerFactory> */
     use HasFactory;
 
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value): ?string => $value === null ? null : mb_strtolower(trim($value)),
+        );
+    }
+
     protected $fillable = [
         'full_name',
         'contact_number',
+        'email',
         'residential_landmark',
         'credit_limit',
         'current_balance',

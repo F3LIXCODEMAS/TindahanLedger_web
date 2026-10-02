@@ -18,6 +18,9 @@ class Payment extends Model
         'ledger_entry_id',
         'amount',
         'payment_date',
+        'note',
+        'payment_batch_id',
+        'idempotency_key',
     ];
 
     protected function casts(): array

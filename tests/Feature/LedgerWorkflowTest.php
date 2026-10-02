@@ -39,14 +39,37 @@ it('blocks a credit entry that exceeds the customer limit', function () {
         'credit_limit' => 1000,
         'current_balance' => 900,
     ]);
+    LedgerEntry::factory()->for($customer)->create([
+        'amount' => '900.00',
+        'running_balance' => '900.00',
+    ]);
 
     expect(fn () => app(LedgerService::class)->recordCredit($customer, [
         'amount' => 101,
         'repayment_deadline' => now()->addDays(7)->toDateString(),
     ]))->toThrow(CreditLimitExceeded::class);
 
-    $this->assertDatabaseCount('ledger_entries', 0);
+    $this->assertDatabaseCount('ledger_entries', 1);
     expect($customer->fresh()->current_balance)->toBe('900.00');
+});
+
+it('derives credit availability from ledger history instead of a stale cached balance', function () {
+    $customer = Customer::factory()->create([
+        'credit_limit' => '5000.00',
+        'current_balance' => '0.00',
+    ]);
+    LedgerEntry::factory()->for($customer)->create([
+        'amount' => '4000.00',
+        'running_balance' => '4000.00',
+    ]);
+
+    $entry = app(LedgerService::class)->recordCredit($customer, [
+        'amount' => '1000.00',
+        'repayment_deadline' => null,
+    ]);
+
+    expect($entry->running_balance)->toBe('5000.00');
+    expect($customer->fresh()->current_balance)->toBe('5000.00');
 });
 
 it('handles exact credit-limit amounts in cents', function () {
@@ -221,22 +244,25 @@ it('uses a configured password for the seeded owner account', function () {
 
     $this->seed();
 
-    $owner = User::query()->where('email', 'owner@example.com')->firstOrFail();
+    $owner = User::query()->where('email', 'felix@gmail.com')->firstOrFail();
 
     expect(Hash::check('only-for-this-test-password', $owner->password))->toBeTrue();
     expect(Hash::check('password', $owner->password))->toBeFalse();
+    expect(User::query()->where('email', 'owner@example.com')->exists())->toBeFalse();
 });
 
 it('does not duplicate demo customers or transactions when seeded repeatedly', function () {
     config(['app.demo_owner_password' => 'only-for-this-test-password']);
 
     $this->seed();
+    $this->assertDatabaseCount('users', 1);
     $this->assertDatabaseCount('customers', 5);
     $this->assertDatabaseCount('ledger_entries', 8);
     $this->assertDatabaseCount('payments', 5);
 
     $this->seed();
 
+    $this->assertDatabaseCount('users', 1);
     $this->assertDatabaseCount('customers', 5);
     $this->assertDatabaseCount('ledger_entries', 8);
     $this->assertDatabaseCount('payments', 5);
