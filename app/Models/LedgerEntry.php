@@ -50,10 +50,24 @@ class LedgerEntry extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function emailReminderLogs(): HasMany
+    {
+        return $this->hasMany(EmailReminderLog::class);
+    }
+
     public function getOutstandingBalanceAttribute(): string
     {
         $amountInCents = Money::toCents($this->amount);
-        $paymentsInCents = Money::toCents((string) $this->payments()->sum('amount'));
+        if ($this->relationLoaded('payments')) {
+            $paymentsInCents = $this->payments->sum(
+                fn (Payment $payment): int => Money::toCents($payment->amount),
+            );
+        } elseif (array_key_exists('paid_amount', $this->attributes)) {
+            $paidAmount = $this->attributes['paid_amount'];
+            $paymentsInCents = $paidAmount === null ? 0 : Money::toCents((string) $paidAmount);
+        } else {
+            $paymentsInCents = Money::toCents((string) $this->payments()->sum('amount'));
+        }
 
         return Money::fromCents($amountInCents - $paymentsInCents);
     }

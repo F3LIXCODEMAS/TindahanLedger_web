@@ -137,6 +137,74 @@
             </div>
         </section>
 
+        <section class="customer-ledger-section" aria-labelledby="reminder-history-title">
+            <div class="ledger-section-heading">
+                <div>
+                    <p class="eyebrow">EMAIL ACTIVITY</p>
+                    <h2 id="reminder-history-title">Repayment reminder history</h2>
+                </div>
+                <span class="ledger-history-count">{{ $reminderHistory->count() }} {{ $reminderHistory->count() === 1 ? 'reminder' : 'reminders' }}</span>
+            </div>
+
+            @if ($reminderHistory->isEmpty())
+                <div class="activity-empty ledger-history-empty" role="status">
+                    <p>No repayment reminders have been scheduled for this customer.</p>
+                </div>
+            @else
+                <ol class="ledger-history-list">
+                    @foreach ($reminderHistory as $reminder)
+                        <li class="ledger-reminder {{ 'is-'.$reminder->delivery_status }}">
+                            <div class="ledger-reminder-heading">
+                                <div>
+                                    <strong>{{ \Illuminate\Support\Str::headline($reminder->reminder_type) }}</strong>
+                                    <time datetime="{{ $reminder->scheduled_reminder_date->toDateString() }}">
+                                        Scheduled {{ $reminder->scheduled_reminder_date->format('M j, Y') }}
+                                    </time>
+                                </div>
+                                <span class="ledger-reminder-status {{ 'is-'.$reminder->delivery_status }}">
+                                    {{ \Illuminate\Support\Str::headline($reminder->delivery_status) }}
+                                </span>
+                            </div>
+                            <dl class="ledger-reminder-details">
+                                <div>
+                                    <dt>Repayment deadline</dt>
+                                    <dd>{{ $reminder->repayment_deadline->format('M j, Y') }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Balance at reminder</dt>
+                                    <dd>₱{{ $reminder->outstanding_amount }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Delivery</dt>
+                                    <dd>
+                                        @if ($reminder->sent_at)
+                                            Sent {{ $reminder->sent_at->format('M j, Y g:i A') }}
+                                        @elseif ($reminder->attempted_at)
+                                            Last attempted {{ $reminder->attempted_at->format('M j, Y g:i A') }}
+                                        @else
+                                            Not sent
+                                        @endif
+                                    </dd>
+                                </div>
+                            </dl>
+                            @if ($reminder->failure_reason)
+                                <p class="ledger-reminder-failure">
+                                    {{ match ($reminder->failure_reason) {
+                                        'customer_email_missing' => 'Skipped because the customer has no email address.',
+                                        'customer_email_invalid' => 'Skipped because the customer email address is invalid.',
+                                        'sender_not_configured' => 'Could not send because store email settings are not configured.',
+                                        'multiple_store_email_settings' => 'Could not send because multiple store email configurations exist.',
+                                        'email_delivery_failed' => 'Email delivery failed. It will be retried on a future run.',
+                                        default => 'Reminder processing failed. It will be retried on a future run.',
+                                    } }}
+                                </p>
+                            @endif
+                        </li>
+                    @endforeach
+                </ol>
+            @endif
+        </section>
+
         <section class="customer-ledger-section ledger-history-section" aria-labelledby="transaction-history-title">
             <div class="ledger-section-heading">
                 <div>

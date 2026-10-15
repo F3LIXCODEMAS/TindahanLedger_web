@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Customer;
+use App\Models\EmailReminderLog;
 use App\Models\LedgerEntry;
 use App\Models\SukiPoint;
 use App\Models\User;
@@ -200,6 +201,44 @@ it('shows the three-cycle reward as achieved without resetting points', function
         ->assertSeeText('₱70.00 / ₱100.00')
         ->assertSeeText('3 / 3')
         ->assertSeeText('Three-cycle reward achieved');
+});
+
+it('shows only the selected customer repayment reminder history', function () {
+    $customer = Customer::factory()->create();
+    $entry = LedgerEntry::factory()->for($customer)->create([
+        'amount' => '250.00',
+        'running_balance' => '250.00',
+        'repayment_deadline' => '2026-10-20',
+    ]);
+    EmailReminderLog::factory()->forLedgerEntry($entry)->create([
+        'reminder_type' => EmailReminderLog::TYPE_ADVANCE,
+        'scheduled_reminder_date' => '2026-10-17',
+        'outstanding_amount' => '250.00',
+        'delivery_status' => EmailReminderLog::STATUS_FAILED,
+        'attempt_count' => 1,
+        'failure_reason' => 'email_delivery_failed',
+    ]);
+
+    $otherCustomer = Customer::factory()->create();
+    $otherEntry = LedgerEntry::factory()->for($otherCustomer)->create([
+        'amount' => '9999.99',
+        'running_balance' => '9999.99',
+        'repayment_deadline' => '2026-10-20',
+    ]);
+    EmailReminderLog::factory()->forLedgerEntry($otherEntry)->create([
+        'reminder_type' => EmailReminderLog::TYPE_DUE_DATE,
+        'scheduled_reminder_date' => '2026-10-20',
+        'outstanding_amount' => '9999.99',
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('customers.show', $customer))
+        ->assertOk()
+        ->assertSeeText('Repayment reminder history')
+        ->assertSeeText('Advance')
+        ->assertSeeText('Failed')
+        ->assertSeeText('Email delivery failed. It will be retried on a future run.')
+        ->assertDontSeeText('₱9999.99');
 });
 
 it('returns a friendly not-found page for an unknown customer', function () {

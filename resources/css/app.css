@@ -1723,6 +1723,100 @@ body.owner-auth-page {
     list-style: none;
 }
 
+.ledger-reminder {
+    min-width: 0;
+    padding: 15px 16px;
+    border: 1px solid var(--color-ledger-line);
+    border-left: 3px solid #8b9890;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.ledger-reminder.is-sent {
+    border-left-color: var(--color-ledger-green);
+}
+
+.ledger-reminder.is-failed {
+    border-left-color: #963f2c;
+}
+
+.ledger-reminder-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ledger-reminder-heading strong {
+    display: block;
+    color: var(--color-ledger-ink);
+    font-size: 14px;
+}
+
+.ledger-reminder-heading time {
+    display: block;
+    margin-top: 3px;
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+}
+
+.ledger-reminder-status {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 4px;
+    color: #58635c;
+    background: #edf0ed;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ledger-reminder-status.is-sent {
+    color: var(--color-ledger-green-dark);
+    background: #e8f0e9;
+}
+
+.ledger-reminder-status.is-failed {
+    color: #8f3d2c;
+    background: #fff0eb;
+}
+
+.ledger-reminder-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 14px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid #edf1ed;
+}
+
+.ledger-reminder-details > div {
+    min-width: 0;
+}
+
+.ledger-reminder-details dt {
+    margin-bottom: 4px;
+    color: var(--color-ledger-muted);
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.ledger-reminder-details dd {
+    margin: 0;
+    color: var(--color-ledger-ink);
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.ledger-reminder-failure {
+    margin: 12px 0 0;
+    color: #8f3d2c;
+    font-size: 12px;
+}
+
 .ledger-transaction {
     padding: 15px 16px;
 }
@@ -1844,6 +1938,10 @@ body.owner-auth-page {
     .ledger-transaction-details {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .ledger-reminder-details {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 600px) {
@@ -1876,7 +1974,8 @@ body.owner-auth-page {
 @media (max-width: 380px) {
     .ledger-balance-grid,
     .customer-ledger-details,
-    .ledger-transaction-details {
+    .ledger-transaction-details,
+    .ledger-reminder-details {
         grid-template-columns: minmax(0, 1fr);
     }
 

@@ -128,7 +128,7 @@ class MailDeliveryService
         return $recipient;
     }
 
-    private function isValidRecipient(?string $recipient): bool
+    public function isValidRecipient(?string $recipient): bool
     {
         if (! is_string($recipient) || trim($recipient) === '') {
             return false;
