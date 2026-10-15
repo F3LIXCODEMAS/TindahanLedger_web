@@ -6,6 +6,7 @@ use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\StoreEmailSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -18,6 +19,14 @@ Route::middleware('guest')->group(function () {
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/settings/email-notifications', [StoreEmailSettingsController::class, 'edit'])
+        ->name('email-settings.edit');
+    Route::put('/settings/email-notifications', [StoreEmailSettingsController::class, 'update'])
+        ->name('email-settings.update');
+    Route::post('/settings/email-notifications/test', [StoreEmailSettingsController::class, 'test'])
+        ->middleware('throttle:email-settings-test')
+        ->name('email-settings.test');
+
     Route::get('/settings/password', [PasswordController::class, 'edit'])->name('password.edit');
     Route::put('/settings/password', [PasswordController::class, 'update'])->name('password.update');
 

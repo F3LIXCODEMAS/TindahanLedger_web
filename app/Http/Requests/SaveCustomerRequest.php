@@ -26,7 +26,7 @@ class SaveCustomerRequest extends FormRequest
         $this->merge([
             'full_name' => is_string($fullName) ? Str::squish($fullName) : $fullName,
             'contact_number' => $this->normalizeContactNumber($contactNumber),
-            'email' => is_string($email) ? Str::lower(trim($email)) : $email,
+            'email' => is_string($email) && trim($email) !== '' ? Str::lower(trim($email)) : null,
             'residential_landmark' => is_string($landmark) ? Str::squish($landmark) : $landmark,
         ]);
     }
@@ -42,7 +42,7 @@ class SaveCustomerRequest extends FormRequest
         return [
             'full_name' => ['required', 'string', 'max:120'],
             'contact_number' => ['required', 'string', 'regex:/^\+639\d{9}$/D', 'max:13'],
-            'email' => ['required', 'email', 'max:255', $emailRule],
+            'email' => ['nullable', 'email', 'max:255', $emailRule],
             'residential_landmark' => ['required', 'string', 'max:255'],
             'credit_limit' => ['required', 'numeric', 'gt:0', 'regex:/^\d{1,10}(?:\.\d{1,2})?$/D'],
         ];
@@ -55,7 +55,6 @@ class SaveCustomerRequest extends FormRequest
             'full_name.max' => 'The customer name may not exceed 120 characters.',
             'contact_number.required' => 'Please enter a contact number.',
             'contact_number.regex' => 'Enter a Philippine mobile number such as 09171234567 or +639171234567.',
-            'email.required' => 'Please enter an email address.',
             'email.email' => 'Enter a valid email address.',
             'email.unique' => 'This email address is already registered to another customer.',
             'residential_landmark.required' => 'Please enter a residential landmark.',

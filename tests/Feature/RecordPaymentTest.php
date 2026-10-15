@@ -2,10 +2,12 @@
 
 use App\Models\Customer;
 use App\Models\Payment;
+use App\Models\StoreEmailSetting;
 use App\Models\SukiPoint;
 use App\Models\SukiPointTransaction;
 use App\Models\User;
 use App\Services\LedgerService;
+use App\Services\MailDeliveryService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -337,7 +339,13 @@ it('returns the existing payment confirmation when the same submission is retrie
 });
 
 it('rolls back every payment allocation if a later allocation fails', function () {
+    $owner = User::factory()->create();
+    StoreEmailSetting::factory()->for($owner)->create();
     $customer = Customer::factory()->create(['credit_limit' => '2000.00']);
+    $customer->update(['email' => 'customer@example.test']);
+    $deliveryService = Mockery::mock(MailDeliveryService::class);
+    $deliveryService->shouldReceive('sendAsOwner')->never();
+    app()->instance(MailDeliveryService::class, $deliveryService);
     $ledgerService = app(LedgerService::class);
     $ledgerService->recordCredit($customer, [
         'amount' => '500.00',
@@ -355,7 +363,7 @@ it('rolls back every payment allocation if a later allocation fails', function (
         }
     });
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($owner)
         ->from('/payments/create')
         ->post('/payments', [
             'customer_id' => $customer->id,

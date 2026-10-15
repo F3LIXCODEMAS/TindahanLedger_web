@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\PaymentExceedsBalance;
 use App\Http\Requests\StorePaymentRequest;
+use App\Mail\PaymentReceipt as PaymentReceiptEmail;
 use App\Models\Customer;
 use App\Models\Payment;
+use App\Models\User;
 use App\Services\LedgerService;
+use App\Services\MailDeliveryService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -44,8 +47,11 @@ class PaymentController extends Controller
         return response()->json($ledgerService->financialSummary($customer));
     }
 
-    public function store(StorePaymentRequest $request, LedgerService $ledgerService): RedirectResponse
-    {
+    public function store(
+        StorePaymentRequest $request,
+        LedgerService $ledgerService,
+        MailDeliveryService $mailDeliveryService,
+    ): RedirectResponse {
         $validated = $request->validated();
 
         try {
@@ -63,6 +69,24 @@ class PaymentController extends Controller
             return back()->withInput()->withErrors([
                 'payment' => 'Unable to record the payment. Please try again.',
             ]);
+        }
+
+        $owner = $request->user();
+        $firstPayment = $receipt['payments']->first();
+
+        if ($firstPayment?->wasRecentlyCreated && $owner instanceof User) {
+            $mailDeliveryService->sendAsOwner(
+                $owner,
+                new PaymentReceiptEmail(
+                    $customer,
+                    $firstPayment,
+                    $receipt['total_amount'],
+                    $receipt['remaining_balance'],
+                    $receipt['debt_cycle_completed'],
+                ),
+                $customer->email,
+                'payment_receipt',
+            );
         }
 
         return redirect()->route('payments.confirmation', $receipt['payment_batch_id'])

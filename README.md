@@ -57,3 +57,35 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Repayment Reminder Scheduler
+
+Repayment reminders are evaluated daily at 8:00 AM using the application's configured timezone. Set `APP_TIMEZONE` in the environment (for example, `Asia/Manila`) and run database migrations before enabling the scheduler.
+
+### Production scheduler
+
+Laravel does not install a system scheduler automatically. Configure the server's cron service to invoke Laravel's scheduler every minute; Laravel will run the reminder command at its configured daily time:
+
+```cron
+* * * * * cd /path/to/TindahanLedger_web && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Replace `/path/to/TindahanLedger_web` with the application's deployment path and ensure the cron user can access PHP, the application, its database, and its configured cache store. For multiple application servers, use a shared cache store to support the scheduler's single-server and overlap locks.
+
+Confirm the registered schedule with `php artisan schedule:list`. The scheduler is not active until the system cron entry is installed.
+
+### Local Windows testing
+
+Set `APP_TIMEZONE=Asia/Manila` in `.env`, then run the scheduler worker in a terminal:
+
+```powershell
+php artisan schedule:work
+```
+
+To run a reminder check immediately without waiting for 8:00 AM, use:
+
+```powershell
+php artisan reminders:send-due
+```
+
+The command prints processed, sent, skipped, and failed counts. Failed sends and reminders skipped for a missing or invalid customer email are retained in the reminder history and retried on a later scheduled run when eligible. Successful reminders are not sent again for the same ledger entry, reminder type, and scheduled date. SMTP delivery cannot guarantee exactly-once behavior if the provider accepts a message but the application fails before recording success; a retry may then produce a duplicate.

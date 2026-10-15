@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\SaveCustomerRequest;
 use App\Models\Customer;
+use App\Models\EmailReminderLog;
 use App\Services\CustomerLedgerService;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
@@ -43,6 +44,11 @@ class CustomerController extends Controller
         return view('customers.show', [
             'customer' => $customer,
             'ledger' => $customerLedgerService->forCustomer($customer),
+            'reminderHistory' => EmailReminderLog::query()
+                ->where('customer_id', $customer->getKey())
+                ->orderByDesc('scheduled_reminder_date')
+                ->orderByDesc('id')
+                ->get(),
         ]);
     }
 

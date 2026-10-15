@@ -26,9 +26,9 @@
     </div>
 
     <div class="form-field">
-        <label for="email">Email address <span aria-hidden="true">*</span></label>
-        <input class="auth-input" id="email" name="email" type="email" value="{{ old('email', $customer->email) }}" autocomplete="email" inputmode="email" maxlength="255" placeholder="customer@example.com" data-normalize-email required @if ($errors->has('email')) aria-invalid="true" @endif aria-describedby="email-help email-error">
-        <p class="password-requirements" id="email-help">Used for future customer reminders. No email is sent when saving a record.</p>
+        <label for="email">Email address <span class="credit-optional">Optional</span></label>
+        <input class="auth-input" id="email" name="email" type="email" value="{{ old('email', $customer->email) }}" autocomplete="email" inputmode="email" maxlength="255" placeholder="customer@example.com" data-normalize-email @if ($errors->has('email')) aria-invalid="true" @endif aria-describedby="email-help email-error">
+        <p class="password-requirements" id="email-help">Receipts are emailed when an address is provided. Leave blank if the customer does not use email.</p>
         <p class="field-error" id="email-error" role="alert" @if (!$errors->has('email')) hidden @endif>@error('email'){{ $message }}@enderror</p>
     </div>
 
