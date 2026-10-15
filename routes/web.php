@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\OverdueAccountController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\StoreEmailSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,8 @@ Route::middleware('guest')->group(function () {
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/overdue-accounts', OverdueAccountController::class)->name('overdue-accounts.index');
+
     Route::get('/settings/email-notifications', [StoreEmailSettingsController::class, 'edit'])
         ->name('email-settings.edit');
     Route::put('/settings/email-notifications', [StoreEmailSettingsController::class, 'update'])

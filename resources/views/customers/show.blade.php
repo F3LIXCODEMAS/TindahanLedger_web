@@ -156,7 +156,7 @@
                         <li class="ledger-reminder {{ 'is-'.$reminder->delivery_status }}">
                             <div class="ledger-reminder-heading">
                                 <div>
-                                    <strong>{{ \Illuminate\Support\Str::headline($reminder->reminder_type) }}</strong>
+                                    <strong>{{ $reminder->reminder_type_label }}</strong>
                                     <time datetime="{{ $reminder->scheduled_reminder_date->toDateString() }}">
                                         Scheduled {{ $reminder->scheduled_reminder_date->format('M j, Y') }}
                                     </time>
@@ -187,17 +187,8 @@
                                     </dd>
                                 </div>
                             </dl>
-                            @if ($reminder->failure_reason)
-                                <p class="ledger-reminder-failure">
-                                    {{ match ($reminder->failure_reason) {
-                                        'customer_email_missing' => 'Skipped because the customer has no email address.',
-                                        'customer_email_invalid' => 'Skipped because the customer email address is invalid.',
-                                        'sender_not_configured' => 'Could not send because store email settings are not configured.',
-                                        'multiple_store_email_settings' => 'Could not send because multiple store email configurations exist.',
-                                        'email_delivery_failed' => 'Email delivery failed. It will be retried on a future run.',
-                                        default => 'Reminder processing failed. It will be retried on a future run.',
-                                    } }}
-                                </p>
+                            @if ($reminder->failure_description)
+                                <p class="ledger-reminder-failure">{{ $reminder->failure_description }}</p>
                             @endif
                         </li>
                     @endforeach
