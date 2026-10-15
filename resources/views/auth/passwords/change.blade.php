@@ -16,6 +16,7 @@
 
         <nav class="owner-navigation" aria-label="Owner navigation">
             <a class="owner-nav-link" href="{{ route('dashboard') }}">Dashboard</a>
+            <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
             <span class="owner-name">{{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
