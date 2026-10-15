@@ -2,9 +2,11 @@
 
 use App\Models\Customer;
 use App\Models\LedgerEntry;
+use App\Models\StoreEmailSetting;
 use App\Models\SukiPoint;
 use App\Models\User;
 use App\Services\LedgerService;
+use App\Services\MailDeliveryService;
 use Illuminate\Support\Str;
 
 it('redirects guests away from the record credit form and submission', function () {
@@ -245,13 +247,21 @@ it('does not change Suki Points or cycle progress when recording credit', functi
 });
 
 it('rolls back a credit if ledger persistence fails', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '1000.00']);
+    $owner = User::factory()->create();
+    StoreEmailSetting::factory()->for($owner)->create();
+    $customer = Customer::factory()->create([
+        'email' => 'customer@example.test',
+        'credit_limit' => '1000.00',
+    ]);
+    $deliveryService = Mockery::mock(MailDeliveryService::class);
+    $deliveryService->shouldReceive('sendAsOwner')->never();
+    app()->instance(MailDeliveryService::class, $deliveryService);
 
     LedgerEntry::creating(function (): void {
         throw new RuntimeException('Simulated persistence failure.');
     });
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($owner)
         ->from('/credits/create')
         ->post('/credits', [
             'customer_id' => $customer->id,

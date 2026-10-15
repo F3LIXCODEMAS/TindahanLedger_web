@@ -1,6 +1,6 @@
 {
     "agents": [
-        "copilot"
+        "copilot","gemini","claude","chatgpt","bard"
     ],
     "cloud": true,
     "guidelines": true,

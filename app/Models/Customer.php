@@ -48,6 +48,11 @@ class Customer extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function emailReminderLogs(): HasMany
+    {
+        return $this->hasMany(EmailReminderLog::class);
+    }
+
     public function sukiPoints(): HasOne
     {
         return $this->hasOne(SukiPoint::class);

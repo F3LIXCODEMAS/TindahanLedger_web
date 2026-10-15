@@ -48,7 +48,7 @@ it('rejects missing fields invalid phone email and credit limit', function () {
     $this->actingAs($owner);
 
     $this->from(route('customers.create'))->post(route('customers.store'), [])
-        ->assertInvalid(['full_name', 'contact_number', 'email', 'residential_landmark', 'credit_limit']);
+        ->assertInvalid(['full_name', 'contact_number', 'residential_landmark', 'credit_limit']);
 
     $this->from(route('customers.create'))->post(route('customers.store'), [
         'full_name' => 'Test Customer',
@@ -59,6 +59,29 @@ it('rejects missing fields invalid phone email and credit limit', function () {
     ])->assertInvalid(['contact_number', 'email', 'credit_limit']);
 
     expect(Customer::query()->count())->toBe(0);
+});
+
+it('creates and updates a customer without requiring an email address', function () {
+    $owner = User::factory()->create();
+    $customerData = [
+        'full_name' => 'Walk-in Customer',
+        'contact_number' => '09171234567',
+        'email' => '',
+        'residential_landmark' => 'Near the store',
+        'credit_limit' => '500.00',
+    ];
+
+    $this->actingAs($owner)
+        ->post(route('customers.store'), $customerData)
+        ->assertRedirect(route('customers.index'));
+
+    $customer = Customer::query()->where('full_name', 'Walk-in Customer')->firstOrFail();
+    expect($customer->email)->toBeNull();
+
+    $this->put(route('customers.update', $customer), $customerData)
+        ->assertRedirect(route('customers.index'));
+
+    expect($customer->fresh()->email)->toBeNull();
 });
 
 it('rejects duplicate normalized name and contact number separately from email', function () {
