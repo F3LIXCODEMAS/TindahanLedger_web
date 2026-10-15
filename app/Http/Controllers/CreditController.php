@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\CreditLimitExceeded;
 use App\Http\Requests\StoreCreditRequest;
+use App\Mail\CreditEntryReceipt;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
+use App\Models\User;
 use App\Services\LedgerService;
+use App\Services\MailDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,8 +45,11 @@ class CreditController extends Controller
         return response()->json($ledgerService->financialSummary($customer));
     }
 
-    public function store(StoreCreditRequest $request, LedgerService $ledgerService): RedirectResponse
-    {
+    public function store(
+        StoreCreditRequest $request,
+        LedgerService $ledgerService,
+        MailDeliveryService $mailDeliveryService,
+    ): RedirectResponse {
         $validated = $request->validated();
 
         try {
@@ -67,6 +73,17 @@ class CreditController extends Controller
             return back()->withInput()->withErrors([
                 'credit' => 'Unable to record the credit. Please try again.',
             ]);
+        }
+
+        $owner = $request->user();
+
+        if ($entry->wasRecentlyCreated && $owner instanceof User) {
+            $mailDeliveryService->sendAsOwner(
+                $owner,
+                new CreditEntryReceipt($customer, $entry),
+                $customer->email,
+                'credit_receipt',
+            );
         }
 
         return redirect()->route('credits.confirmation', $entry)

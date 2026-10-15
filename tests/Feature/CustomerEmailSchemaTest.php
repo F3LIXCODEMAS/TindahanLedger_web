@@ -3,9 +3,10 @@
 use App\Models\Customer;
 use Illuminate\Database\QueryException;
 
-it('requires customer email at the database level', function () {
-    expect(fn () => Customer::factory()->create(['email' => null]))
-        ->toThrow(QueryException::class);
+it('allows a customer email to be missing at the database level', function () {
+    $customer = Customer::factory()->create(['email' => null]);
+
+    expect($customer->fresh()->email)->toBeNull();
 });
 
 it('enforces unique customer email at the database level', function () {

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Mail\CreditEntryReceipt;
+use App\Mail\PaymentReceipt;
 use App\Mail\ReusableEmail;
 use App\Models\User;
 use Illuminate\Mail\Mailable;
@@ -35,34 +37,49 @@ class MailDeliveryService
      * Returns false without attempting delivery when the owner has not saved
      * usable email settings, so mail is never silently sent from another account.
      */
-    public function sendAsOwner(User $owner, Mailable $mailable, string $recipient, string $notificationType): bool
+    public function sendAsOwner(User $owner, Mailable $mailable, ?string $recipient, string $notificationType): bool
     {
-        $recipient = $this->validatedRecipient($recipient);
-        $settings = $owner->storeEmailSetting;
-        $appPassword = $settings?->appPassword();
-
-        if ($settings === null || $appPassword === null) {
-            Log::warning('Email not sent because store email settings are not configured.', [
-                'notification_type' => $notificationType,
-                'owner_id' => $owner->getKey(),
-                'needs_password_reentry' => $settings?->needsPasswordReentry() ?? false,
-            ]);
-
+        if (! $this->isValidRecipient($recipient)) {
             return false;
         }
 
-        if ($mailable instanceof ReusableEmail && $mailable->storeName === null) {
-            $mailable->storeName = $settings->store_name;
-        }
+        $recipient = $this->validatedRecipient($recipient);
 
-        return $this->sendWithGmail(
-            $mailable,
-            $recipient,
-            $settings->sender_email,
-            $settings->store_name,
-            $appPassword,
-            $notificationType,
-        );
+        try {
+            $settings = $owner->storeEmailSetting;
+            $appPassword = $settings?->appPassword();
+
+            if ($settings === null || $appPassword === null) {
+                Log::warning('Email not sent because store email settings are not configured.', [
+                    'notification_type' => $notificationType,
+                    'owner_id' => $owner->getKey(),
+                    'needs_password_reentry' => $settings?->needsPasswordReentry() ?? false,
+                ]);
+
+                return false;
+            }
+
+            if ($mailable instanceof ReusableEmail && $mailable->storeName === null) {
+                $mailable->storeName = $settings->store_name;
+            }
+
+            if ($mailable instanceof CreditEntryReceipt || $mailable instanceof PaymentReceipt) {
+                $mailable->storeName = $settings->store_name;
+            }
+
+            return $this->sendWithGmail(
+                $mailable,
+                $recipient,
+                $settings->sender_email,
+                $settings->store_name,
+                $appPassword,
+                $notificationType,
+            );
+        } catch (Throwable $exception) {
+            $this->logFailure($exception, $recipient, $notificationType);
+
+            return false;
+        }
     }
 
     public function sendWithGmail(
@@ -104,14 +121,29 @@ class MailDeliveryService
     {
         $recipient = trim($recipient);
 
-        if (! Validator::make(
-            ['recipient' => $recipient],
-            ['recipient' => ['required', 'email', 'max:255']],
-        )->passes()) {
+        if (! $this->isValidRecipient($recipient)) {
             throw new InvalidArgumentException('Recipient must be a valid email address.');
         }
 
         return $recipient;
+    }
+
+    private function isValidRecipient(?string $recipient): bool
+    {
+        if (! is_string($recipient) || trim($recipient) === '') {
+            return false;
+        }
+
+        $domain = Str::afterLast(trim($recipient), '@');
+
+        if (Str::endsWith(Str::lower($domain), '.invalid')) {
+            return false;
+        }
+
+        return Validator::make(
+            ['recipient' => trim($recipient)],
+            ['recipient' => ['required', 'email', 'max:255']],
+        )->passes();
     }
 
     /**
