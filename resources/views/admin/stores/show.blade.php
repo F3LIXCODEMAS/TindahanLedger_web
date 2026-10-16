@@ -106,7 +106,10 @@
     </section>
 
     <section class="admin-panel" aria-labelledby="store-activity-title">
-        <h2 id="store-activity-title">Recent transactions</h2>
+        <div class="admin-panel-heading">
+            <h2 id="store-activity-title">Recent transactions</h2>
+            <a class="admin-button-secondary" href="{{ route('admin.transactions.index', ['store_id' => $store->id]) }}">View all transactions</a>
+        </div>
         @if ($recentActivity->isEmpty())
             <p class="admin-muted">No credits or payments have been recorded for this store.</p>
         @else

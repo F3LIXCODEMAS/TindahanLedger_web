@@ -50,7 +50,8 @@ class PlatformMetricsService
             ->first();
 
         $paymentsReceived = Payment::query()
-            ->whereBetween('payment_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->where('payment_date', '>=', $periodStart->toDateString())
+            ->where('payment_date', '<', $periodEnd->addDay()->toDateString())
             ->sum('amount');
 
         return [

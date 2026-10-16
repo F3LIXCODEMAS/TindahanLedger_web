@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\StoreCustomerController;
 use App\Http\Controllers\Admin\StoreOwnerController;
 use App\Http\Controllers\Admin\StoreStatusController;
+use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\UserPasswordController;
 use App\Http\Controllers\Admin\UserStatusController;
@@ -45,6 +46,8 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_SUPER_ADMIN])
         Route::get('/stores/{store}/customers/{customer}', [StoreCustomerController::class, 'show'])
             ->scopeBindings()
             ->name('stores.customers.show');
+
+        Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
 
         Route::resource('users', UserController::class)->only(['index', 'create', 'store', 'show']);
         Route::patch('/users/{user}/status', [UserStatusController::class, 'update'])->name('users.status.update');
