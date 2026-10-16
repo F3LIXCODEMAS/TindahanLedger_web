@@ -21,6 +21,7 @@
                 'stores' => ['Stores', route('admin.stores.index')],
                 'users' => ['Users', route('admin.users.index')],
                 'transactions' => ['Transactions', route('admin.transactions.index')],
+                'analytics' => ['Analytics', route('admin.analytics')],
             ] as $navKey => [$navLabel, $navUrl])
                 <a class="owner-nav-link {{ $activeNav === $navKey ? 'is-current' : '' }}" href="{{ $navUrl }}" @if ($activeNav === $navKey) aria-current="page" @endif>{{ $navLabel }}</a>
             @endforeach

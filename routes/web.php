@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\StoreCustomerController;
 use App\Http\Controllers\Admin\StoreOwnerController;
@@ -48,6 +49,7 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_SUPER_ADMIN])
             ->name('stores.customers.show');
 
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+        Route::get('/analytics', AnalyticsController::class)->name('analytics');
 
         Route::resource('users', UserController::class)->only(['index', 'create', 'store', 'show']);
         Route::patch('/users/{user}/status', [UserStatusController::class, 'update'])->name('users.status.update');
