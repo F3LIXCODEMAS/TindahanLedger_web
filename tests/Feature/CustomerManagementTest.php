@@ -7,7 +7,8 @@ use App\Services\LedgerService;
 use Illuminate\Support\Facades\Mail;
 
 it('redirects guests away from the customer list and forms', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
 
     $this->get(route('customers.index'))->assertRedirect(route('login'));
     $this->get(route('customers.create'))->assertRedirect(route('login'));
@@ -15,7 +16,8 @@ it('redirects guests away from the customer list and forms', function () {
 });
 
 it('lets the owner open the customer list and add form', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
 
     $this->actingAs($owner)->get(route('customers.index'))->assertOk()->assertSee('Customers');
     $this->get(route('customers.create'))->assertOk()->assertSee('Add customer');
@@ -74,7 +76,8 @@ it('forbids creating a customer when the owner has no store', function () {
 });
 
 it('rejects missing fields invalid phone email and credit limit', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     $this->actingAs($owner);
 
     $this->from(route('customers.create'))->post(route('customers.store'), [])
@@ -115,8 +118,9 @@ it('creates and updates a customer without requiring an email address', function
 });
 
 it('rejects duplicate normalized name and contact number separately from email', function () {
-    $owner = User::factory()->create();
-    Customer::factory()->create([
+    $store = Store::factory()->create();
+    $owner = $store->owner;
+    Customer::factory()->for($store)->create([
         'full_name' => 'Maria Santos',
         'contact_number' => '+639171234567',
         'email' => 'first@example.test',
@@ -134,8 +138,9 @@ it('rejects duplicate normalized name and contact number separately from email',
 });
 
 it('rejects duplicate email addresses during customer creation', function () {
-    $owner = User::factory()->create();
-    Customer::factory()->create(['email' => 'first@example.test']);
+    $store = Store::factory()->create();
+    $owner = $store->owner;
+    Customer::factory()->for($store)->create(['email' => 'first@example.test']);
 
     $this->actingAs($owner)->from(route('customers.create'))->post(route('customers.store'), [
         'full_name' => 'Different Customer',
@@ -149,8 +154,9 @@ it('rejects duplicate email addresses during customer creation', function () {
 });
 
 it('edits a customer while allowing its unchanged email and normalized identity', function () {
-    $owner = User::factory()->create();
-    $customer = Customer::factory()->create([
+    $store = Store::factory()->create();
+    $owner = $store->owner;
+    $customer = Customer::factory()->for($store)->create([
         'full_name' => 'Maria Santos',
         'contact_number' => '+639171234567',
         'email' => 'maria@example.test',
@@ -175,13 +181,14 @@ it('edits a customer while allowing its unchanged email and normalized identity'
 });
 
 it('rejects another customer email and normalized duplicate during customer edit', function () {
-    $owner = User::factory()->create();
-    $customer = Customer::factory()->create([
+    $store = Store::factory()->create();
+    $owner = $store->owner;
+    $customer = Customer::factory()->for($store)->create([
         'full_name' => 'Maria Santos',
         'contact_number' => '+639171234567',
         'email' => 'maria@example.test',
     ]);
-    Customer::factory()->create([
+    Customer::factory()->for($store)->create([
         'full_name' => 'Jose Reyes',
         'contact_number' => '+639181234567',
         'email' => 'jose@example.test',
@@ -206,8 +213,9 @@ it('rejects another customer email and normalized duplicate during customer edit
 });
 
 it('does not lower a credit limit below ledger-derived outstanding debt', function () {
-    $owner = User::factory()->create();
-    $customer = Customer::factory()->create(['credit_limit' => '1000.00']);
+    $store = Store::factory()->create();
+    $owner = $store->owner;
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '1000.00']);
     $entry = app(LedgerService::class)->recordCredit($customer, [
         'amount' => '500.00',
         'repayment_deadline' => now()->addDays(10)->toDateString(),
@@ -227,8 +235,9 @@ it('does not lower a credit limit below ledger-derived outstanding debt', functi
 });
 
 it('allows a customer to change to another unique email', function () {
-    $owner = User::factory()->create();
-    $customer = Customer::factory()->create(['email' => 'before@example.test']);
+    $store = Store::factory()->create();
+    $owner = $store->owner;
+    $customer = Customer::factory()->for($store)->create(['email' => 'before@example.test']);
 
     $this->actingAs($owner)->put(route('customers.update', $customer), [
         'full_name' => $customer->full_name,
@@ -242,9 +251,10 @@ it('allows a customer to change to another unique email', function () {
 });
 
 it('creates and edits customer records without sending mail', function () {
+    $store = Store::factory()->create();
     Mail::fake();
-    $owner = User::factory()->create();
-    $customer = Customer::factory()->create();
+    $owner = $store->owner;
+    $customer = Customer::factory()->for($store)->create();
 
     $this->actingAs($owner)->put(route('customers.update', $customer), [
         'full_name' => $customer->full_name,

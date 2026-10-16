@@ -74,6 +74,7 @@ class EmailReminderLog extends Model
                 'customer_email_invalid' => 'Skipped because the customer email address is invalid.',
                 'sender_not_configured' => 'Could not send because store email settings are not configured.',
                 'multiple_store_email_settings' => 'Could not send because multiple store email configurations exist.',
+                'store_unavailable' => 'Not sent because the store is suspended or its owner account is inactive. It will be retried once the store is active.',
                 'email_delivery_failed' => 'Email delivery failed. It will be retried on a future run.',
                 default => 'Reminder processing failed. It will be retried on a future run.',
             });

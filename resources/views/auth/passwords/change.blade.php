@@ -7,16 +7,19 @@
     <title>Change Password | {{ config('app.name', 'TindahanLedger') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
+@php($homeUrl = auth()->user()->isSuperAdmin() ? route('admin.dashboard') : route('dashboard'))
 <body class="ledger-app-page">
     <header class="ledger-topbar">
-        <a class="brand-lockup ledger-brand" href="{{ route('dashboard') }}" aria-label="TindahanLedger dashboard">
+        <a class="brand-lockup ledger-brand" href="{{ $homeUrl }}" aria-label="TindahanLedger dashboard">
             <span class="brand-mark" aria-hidden="true">TL</span>
             <span class="brand-name">TindahanLedger</span>
         </a>
 
         <nav class="owner-navigation" aria-label="Owner navigation">
-            <a class="owner-nav-link" href="{{ route('dashboard') }}">Dashboard</a>
-            <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
+            <a class="owner-nav-link" href="{{ $homeUrl }}">Dashboard</a>
+            @if (auth()->user()->isStoreOwner())
+                <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
+            @endif
             <span class="owner-name">{{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
@@ -26,7 +29,7 @@
     </header>
 
     <main class="password-content">
-        <a class="back-link" href="{{ route('dashboard') }}">← Back to dashboard</a>
+        <a class="back-link" href="{{ $homeUrl }}">← Back to dashboard</a>
 
         <section class="password-panel" aria-labelledby="password-title">
             <div class="form-heading">

@@ -33,6 +33,16 @@
             <p>Current balances and recent ledger activity.</p>
         </header>
 
+        @if (session('status'))
+            <p class="status-banner" role="status">{{ session('status') }}</p>
+        @endif
+
+        @if ($storeIsSuspended)
+            <p class="status-banner" role="alert">
+                {{ $errors->first('store') ?: 'This store is suspended. Records are read-only until an administrator reactivates it.' }}
+            </p>
+        @endif
+
         <section class="dashboard-metrics" aria-label="Store summary">
             <article class="metric-panel metric-collectibles" aria-labelledby="collectibles-title">
                 <div class="metric-label-row">

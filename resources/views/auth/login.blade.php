@@ -32,29 +32,30 @@
                 <div class="form-heading">
                     <p class="eyebrow">OWNER SIGN IN</p>
                     <h2 id="login-title">Welcome back</h2>
-                    <p>Sign in with your store owner account.</p>
+                    <p>Sign in with your account username and password.</p>
                 </div>
 
                 <form class="login-form" method="POST" action="{{ route('login.store') }}" data-login-form>
                     @csrf
 
                     <div class="form-field">
-                        <label for="email">Email address</label>
+                        <label for="username">Username</label>
                         <input
                             class="auth-input"
-                            id="email"
-                            name="email"
-                            type="email"
-                            value="{{ old('email') }}"
+                            id="username"
+                            name="username"
+                            type="text"
+                            value="{{ old('username') }}"
                             autocomplete="username"
-                            inputmode="email"
-                            placeholder="owner@example.com"
+                            autocapitalize="none"
+                            maxlength="120"
+                            placeholder="Your store name"
                             required
                             autofocus
-                            @if ($errors->has('email')) aria-invalid="true" @endif
-                            aria-describedby="email-error"
+                            @if ($errors->has('username')) aria-invalid="true" @endif
+                            aria-describedby="username-error"
                         >
-                        <p class="field-error" id="email-error" role="alert" @if (!$errors->has('email')) hidden @endif>@error('email'){{ $message }}@enderror</p>
+                        <p class="field-error" id="username-error" role="alert" @if (!$errors->has('username')) hidden @endif>@error('username'){{ $message }}@enderror</p>
                     </div>
 
                     <div class="form-field">

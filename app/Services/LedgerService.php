@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Exceptions\CreditLimitExceeded;
 use App\Exceptions\PaymentExceedsBalance;
+use App\Exceptions\StoreSuspended;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Models\Store;
 use App\Models\SukiPoint;
 use App\Support\Money;
 use Illuminate\Support\Collection;
@@ -22,6 +24,7 @@ class LedgerService
     {
         return DB::transaction(function () use ($customer, $attributes): LedgerEntry {
             $lockedCustomer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+            $this->ensureStoreIsActive($lockedCustomer);
 
             if (! empty($attributes['idempotency_key'])) {
                 $existingEntry = $lockedCustomer->ledgerEntries()
@@ -73,6 +76,7 @@ class LedgerService
         return DB::transaction(function () use ($entry, $amount, $paymentDate): Payment {
             $customerId = LedgerEntry::query()->whereKey($entry->id)->value('customer_id');
             $lockedCustomer = Customer::query()->lockForUpdate()->findOrFail($customerId);
+            $this->ensureStoreIsActive($lockedCustomer);
             $lockedEntry = LedgerEntry::query()->lockForUpdate()->findOrFail($entry->id);
             $paymentAmountInCents = Money::toCents($amount);
 
@@ -124,6 +128,7 @@ class LedgerService
     {
         return DB::transaction(function () use ($customer, $attributes): array {
             $lockedCustomer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+            $this->ensureStoreIsActive($lockedCustomer);
             $existingPayment = Payment::query()
                 ->where('idempotency_key', $attributes['idempotency_key'])
                 ->first();
@@ -281,6 +286,23 @@ class LedgerService
             'available_credit' => Money::fromCents(max(0, $creditLimitInCents - $outstandingBalanceInCents)),
             'credit_limit' => Money::fromCents($creditLimitInCents),
         ];
+    }
+
+    /**
+     * Read the store status with a shared lock so a concurrent suspension
+     * waits for in-flight credits and payments to finish, and any write that
+     * starts after the suspension commits is rejected.
+     */
+    private function ensureStoreIsActive(Customer $lockedCustomer): void
+    {
+        $storeStatus = Store::query()
+            ->whereKey($lockedCustomer->store_id)
+            ->sharedLock()
+            ->value('status');
+
+        if ($storeStatus !== Store::STATUS_ACTIVE) {
+            throw new StoreSuspended;
+        }
     }
 
     private function completeDebtCycle(Customer $customer): void

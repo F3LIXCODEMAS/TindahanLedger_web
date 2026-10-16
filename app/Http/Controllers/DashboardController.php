@@ -7,20 +7,25 @@ use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(Request $request): View
     {
+        $storeId = $request->user()->store->getKey();
+
         $paymentsByEntry = DB::table('payments')
             ->select('ledger_entry_id')
             ->selectRaw('SUM(amount) AS total_paid')
             ->groupBy('ledger_entry_id');
 
         $totalOutstanding = DB::table('ledger_entries')
+            ->join('customers', 'customers.id', '=', 'ledger_entries.customer_id')
+            ->where('customers.store_id', $storeId)
             ->leftJoinSub($paymentsByEntry, 'payments_by_entry', function ($join): void {
                 $join->on('payments_by_entry.ledger_entry_id', '=', 'ledger_entries.id');
             })
@@ -30,6 +35,7 @@ class DashboardController extends Controller
         $today = now()->toDateString();
 
         $overdueAccountCount = Customer::query()
+            ->where('store_id', $storeId)
             ->whereHas('ledgerEntries', function (Builder $query) use ($today): void {
                 $query->where('repayment_deadline', '<', $today)
                     ->whereRaw('ledger_entries.amount > COALESCE((SELECT SUM(payments.amount) FROM payments WHERE payments.ledger_entry_id = ledger_entries.id), 0)');
@@ -38,6 +44,7 @@ class DashboardController extends Controller
 
         $recentCredits = LedgerEntry::query()
             ->with('customer')
+            ->whereRelation('customer', 'store_id', $storeId)
             ->latest('created_at')
             ->latest('id')
             ->limit(8)
@@ -57,6 +64,7 @@ class DashboardController extends Controller
             ->selectRaw('SUM(payments.amount) AS amount')
             ->selectRaw('MAX(payments.created_at) AS created_at')
             ->selectRaw('MAX(payments.id) AS id')
+            ->where('customers.store_id', $storeId)
             ->whereNotNull('payments.payment_batch_id')
             ->groupBy('payments.payment_batch_id', 'payments.customer_id', 'customers.full_name')
             ->orderByDesc(DB::raw('MAX(payments.created_at)'))
@@ -74,6 +82,7 @@ class DashboardController extends Controller
 
         $recentLegacyPayments = Payment::query()
             ->with('customer')
+            ->whereRelation('customer', 'store_id', $storeId)
             ->whereNull('payment_batch_id')
             ->latest('created_at')
             ->latest('id')
@@ -111,6 +120,7 @@ class DashboardController extends Controller
             'totalCollectibles' => Money::fromCents(Money::toCents((string) ($totalOutstanding ?? '0'))),
             'overdueAccountCount' => $overdueAccountCount,
             'recentActivity' => $recentActivity,
+            'storeIsSuspended' => ! $request->user()->store->isActive(),
         ]);
     }
 }

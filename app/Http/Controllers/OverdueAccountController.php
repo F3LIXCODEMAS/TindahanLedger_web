@@ -18,7 +18,7 @@ class OverdueAccountController extends Controller
         $sort = $filters['sort'] ?? 'longest';
 
         return view('overdue-accounts.index', [
-            'customers' => $overdueAccountService->paginate($search, $sort),
+            'customers' => $overdueAccountService->paginate($request->user()->store, $search, $sort),
             'search' => $search,
             'sort' => $sort,
         ]);

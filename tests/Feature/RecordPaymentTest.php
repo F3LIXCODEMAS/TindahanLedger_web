@@ -2,10 +2,10 @@
 
 use App\Models\Customer;
 use App\Models\Payment;
+use App\Models\Store;
 use App\Models\StoreEmailSetting;
 use App\Models\SukiPoint;
 use App\Models\SukiPointTransaction;
-use App\Models\User;
 use App\Services\LedgerService;
 use App\Services\MailDeliveryService;
 use Illuminate\Support\Carbon;
@@ -20,13 +20,14 @@ it('redirects guests away from the Record Payment form and submission', function
 });
 
 it('shows a selected customer balance on the payment form', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '2000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '2000.00']);
     app(LedgerService::class)->recordCredit($customer, [
         'amount' => '1500.00',
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get('/payments/create?customer_id='.$customer->id)
         ->assertOk()
         ->assertViewHas('selectedCustomerId', $customer->id)
@@ -34,9 +35,10 @@ it('shows a selected customer balance on the payment form', function () {
 });
 
 it('shows a zero-balance state and disables payment when the customer has no debt', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get('/payments/create?customer_id='.$customer->id)
         ->assertOk()
         ->assertSeeText('₱0.00')
@@ -45,7 +47,8 @@ it('shows a zero-balance state and disables payment when the customer has no deb
 });
 
 it('shows an add-customer state when there are no customers', function () {
-    $this->actingAs(User::factory()->create())
+    $store = Store::factory()->create();
+    $this->actingAs($store->owner)
         ->get('/payments/create')
         ->assertOk()
         ->assertSeeText('No customers available.')
@@ -54,14 +57,15 @@ it('shows an add-customer state when there are no customers', function () {
 });
 
 it('records a partial payment with a note and confirms the remaining balance', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '2000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '2000.00']);
     $entry = app(LedgerService::class)->recordCredit($customer, [
         'amount' => '1500.00',
         'repayment_deadline' => null,
     ]);
     $idempotencyKey = (string) Str::uuid();
 
-    $response = $this->actingAs(User::factory()->create())
+    $response = $this->actingAs($store->owner)
         ->post('/payments', [
             'customer_id' => $customer->id,
             'amount' => '400.00',
@@ -95,13 +99,14 @@ it('records a partial payment with a note and confirms the remaining balance', f
 });
 
 it('records a payment without an optional note', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '1000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '1000.00']);
     $entry = app(LedgerService::class)->recordCredit($customer, [
         'amount' => '500.00',
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->post('/payments', [
             'customer_id' => $customer->id,
             'amount' => '100.00',
@@ -116,8 +121,9 @@ it('records a payment without an optional note', function () {
 });
 
 it('allocates a payment to the oldest outstanding credits first and groups the receipt in the ledger', function () {
+    $store = Store::factory()->create();
     $this->travelTo(Carbon::parse('2026-10-01 12:00:00'));
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     $ledgerService = app(LedgerService::class);
     $oldestCredit = $ledgerService->recordCredit($customer, [
         'amount' => '500.00',
@@ -130,7 +136,7 @@ it('allocates a payment to the oldest outstanding credits first and groups the r
         'repayment_deadline' => '2026-10-15',
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->post('/payments', [
             'customer_id' => $customer->id,
             'amount' => '700.00',
@@ -163,8 +169,9 @@ it('allocates a payment to the oldest outstanding credits first and groups the r
 });
 
 it('keeps overdue status through partial payment and clears it when the overdue debt is settled', function () {
+    $store = Store::factory()->create();
     $this->travelTo(Carbon::parse('2026-10-01 12:00:00'));
-    $customer = Customer::factory()->create(['credit_limit' => '2000.00']);
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '2000.00']);
     $ledgerService = app(LedgerService::class);
     $overdueCredit = $ledgerService->recordCredit($customer, [
         'amount' => '500.00',
@@ -176,7 +183,7 @@ it('keeps overdue status through partial payment and clears it when the overdue 
         'transaction_date' => '2026-09-20',
         'repayment_deadline' => '2026-10-10',
     ]);
-    $owner = User::factory()->create();
+    $owner = $store->owner;
 
     $this->actingAs($owner)->post('/payments', [
         'customer_id' => $customer->id,
@@ -212,7 +219,8 @@ it('keeps overdue status through partial payment and clears it when the overdue 
 });
 
 it('completes a debt cycle only when a full payment clears all outstanding credits', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     $ledgerService = app(LedgerService::class);
     $firstCredit = $ledgerService->recordCredit($customer, [
         'amount' => '500.00',
@@ -223,7 +231,7 @@ it('completes a debt cycle only when a full payment clears all outstanding credi
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->post('/payments', [
             'customer_id' => $customer->id,
             'amount' => '1500.00',
@@ -247,13 +255,14 @@ it('completes a debt cycle only when a full payment clears all outstanding credi
 });
 
 it('blocks payments greater than the actual outstanding balance and preserves the input', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '1000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '1000.00']);
     app(LedgerService::class)->recordCredit($customer, [
         'amount' => '500.00',
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->from('/payments/create?customer_id='.$customer->id)
         ->post('/payments', [
             'customer_id' => $customer->id,
@@ -269,9 +278,10 @@ it('blocks payments greater than the actual outstanding balance and preserves th
 });
 
 it('rejects a payment when the selected customer has zero balance', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->from('/payments/create?customer_id='.$customer->id)
         ->post('/payments', [
             'customer_id' => $customer->id,
@@ -285,7 +295,8 @@ it('rejects a payment when the selected customer has zero balance', function () 
 });
 
 it('rejects missing or invalid customer and payment amount input', function (array $payload, array $invalidFields) {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
     $entry = app(LedgerService::class)->recordCredit($customer, [
         'amount' => '100.00',
         'repayment_deadline' => null,
@@ -296,7 +307,7 @@ it('rejects missing or invalid customer and payment amount input', function (arr
         'idempotency_key' => (string) Str::uuid(),
     ], $payload);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->from('/payments/create')
         ->post('/payments', $payload)
         ->assertRedirect('/payments/create')
@@ -315,12 +326,13 @@ it('rejects missing or invalid customer and payment amount input', function (arr
 ]);
 
 it('returns the existing payment confirmation when the same submission is retried', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '1000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '1000.00']);
     app(LedgerService::class)->recordCredit($customer, [
         'amount' => '500.00',
         'repayment_deadline' => null,
     ]);
-    $owner = User::factory()->create();
+    $owner = $store->owner;
     $idempotencyKey = (string) Str::uuid();
     $payload = [
         'customer_id' => $customer->id,
@@ -339,9 +351,10 @@ it('returns the existing payment confirmation when the same submission is retrie
 });
 
 it('rolls back every payment allocation if a later allocation fails', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create(['credit_limit' => '2000.00']);
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '2000.00']);
     $customer->update(['email' => 'customer@example.test']);
     $deliveryService = Mockery::mock(MailDeliveryService::class);
     $deliveryService->shouldReceive('sendAsOwner')->never();

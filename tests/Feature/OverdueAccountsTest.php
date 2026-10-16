@@ -4,7 +4,7 @@ use App\Models\Customer;
 use App\Models\EmailReminderLog;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
-use App\Models\User;
+use App\Models\Store;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 
@@ -14,24 +14,26 @@ it('redirects guests from the overdue accounts page', function () {
 });
 
 it('shows a clear empty state when no account is overdue', function () {
+    $store = Store::factory()->create();
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(Carbon::parse('2026-10-15 10:00:00', 'Asia/Manila'));
-    $customer = Customer::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
     LedgerEntry::factory()->for($customer)->create([
         'amount' => '100.00',
         'repayment_deadline' => '2026-10-15',
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index'))
         ->assertOk()
         ->assertSeeText('No customers have overdue balances.');
 });
 
 it('lists only overdue entries with unpaid balances', function () {
+    $store = Store::factory()->create();
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(Carbon::parse('2026-10-15 10:00:00', 'Asia/Manila'));
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'full_name' => 'Marisol Santos',
         'contact_number' => '09171234567',
     ]);
@@ -63,7 +65,7 @@ it('lists only overdue entries with unpaid balances', function () {
         'repayment_deadline' => '2026-10-20',
     ]);
 
-    $response = $this->actingAs(User::factory()->create())
+    $response = $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index'));
 
     $response->assertOk()
@@ -83,9 +85,10 @@ it('lists only overdue entries with unpaid balances', function () {
 });
 
 it('escapes customer names in the overdue account list', function () {
+    $store = Store::factory()->create();
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(Carbon::parse('2026-10-15 10:00:00', 'Asia/Manila'));
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'full_name' => 'Luz <script>alert(1)</script>',
     ]);
     LedgerEntry::factory()->for($customer)->create([
@@ -93,7 +96,7 @@ it('escapes customer names in the overdue account list', function () {
         'repayment_deadline' => '2026-10-01',
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index'))
         ->assertOk()
         ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false)
@@ -101,9 +104,10 @@ it('escapes customer names in the overdue account list', function () {
 });
 
 it('shows each overdue entry once with its persisted reminder attempts', function () {
+    $store = Store::factory()->create();
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(Carbon::parse('2026-10-15 10:00:00', 'Asia/Manila'));
-    $customer = Customer::factory()->create(['full_name' => 'Liza Reyes']);
+    $customer = Customer::factory()->for($store)->create(['full_name' => 'Liza Reyes']);
     $olderEntry = LedgerEntry::factory()->for($customer)->create([
         'amount' => '500.00',
         'itemized_list' => ['Flour'],
@@ -133,7 +137,7 @@ it('shows each overdue entry once with its persisted reminder attempts', functio
         'failure_reason' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index'))
         ->assertOk()
         ->assertSeeText('Liza Reyes')
@@ -154,11 +158,12 @@ it('shows each overdue entry once with its persisted reminder attempts', functio
 });
 
 it('sorts overdue customers by longest overdue and then by highest outstanding balance', function () {
+    $store = Store::factory()->create();
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(Carbon::parse('2026-10-15 10:00:00', 'Asia/Manila'));
-    $oldestLowBalance = Customer::factory()->create(['full_name' => 'Ana Low']);
-    $oldestHighBalance = Customer::factory()->create(['full_name' => 'Belen High']);
-    $newerHighestBalance = Customer::factory()->create(['full_name' => 'Cora New']);
+    $oldestLowBalance = Customer::factory()->for($store)->create(['full_name' => 'Ana Low']);
+    $oldestHighBalance = Customer::factory()->for($store)->create(['full_name' => 'Belen High']);
+    $newerHighestBalance = Customer::factory()->for($store)->create(['full_name' => 'Cora New']);
 
     LedgerEntry::factory()->for($oldestLowBalance)->create([
         'amount' => '100.00',
@@ -173,7 +178,7 @@ it('sorts overdue customers by longest overdue and then by highest outstanding b
         'repayment_deadline' => '2026-10-10',
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index'))
         ->assertOk()
         ->assertViewHas('customers', fn ($customers): bool => $customers->getCollection()
@@ -196,9 +201,10 @@ it('sorts overdue customers by longest overdue and then by highest outstanding b
 });
 
 it('filters by customer name and retains selected controls', function () {
+    $store = Store::factory()->create();
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(Carbon::parse('2026-10-15 10:00:00', 'Asia/Manila'));
-    Customer::factory()->create(['full_name' => 'Maria Dela Cruz'])
+    Customer::factory()->for($store)->create(['full_name' => 'Maria Dela Cruz'])
         ->ledgerEntries()->create([
             'amount' => '100.00',
             'itemized_list' => ['Rice'],
@@ -206,7 +212,7 @@ it('filters by customer name and retains selected controls', function () {
             'repayment_deadline' => '2026-10-01',
             'running_balance' => '100.00',
         ]);
-    Customer::factory()->create(['full_name' => 'Pedro Santos'])
+    Customer::factory()->for($store)->create(['full_name' => 'Pedro Santos'])
         ->ledgerEntries()->create([
             'amount' => '200.00',
             'itemized_list' => ['Sugar'],
@@ -215,7 +221,7 @@ it('filters by customer name and retains selected controls', function () {
             'running_balance' => '200.00',
         ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index', ['search' => 'maria', 'sort' => 'balance']))
         ->assertOk()
         ->assertSeeText('Maria Dela Cruz')
@@ -225,9 +231,10 @@ it('filters by customer name and retains selected controls', function () {
 });
 
 it('uses the configured timezone for the overdue date boundary', function () {
+    $store = Store::factory()->create();
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(CarbonImmutable::parse('2026-10-14 16:30:00', 'UTC'));
-    $customer = Customer::factory()->create(['full_name' => 'Boundary Customer']);
+    $customer = Customer::factory()->for($store)->create(['full_name' => 'Boundary Customer']);
     $yesterdayDeadline = LedgerEntry::factory()->for($customer)->create([
         'amount' => '100.00',
         'repayment_deadline' => '2026-10-14',
@@ -238,7 +245,7 @@ it('uses the configured timezone for the overdue date boundary', function () {
         'repayment_deadline' => '2026-10-15',
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index'))
         ->assertOk()
         ->assertSeeText('Boundary Customer')
@@ -252,7 +259,8 @@ it('uses the configured timezone for the overdue date boundary', function () {
 });
 
 it('rejects unsupported sorting options', function () {
-    $this->actingAs(User::factory()->create())
+    $store = Store::factory()->create();
+    $this->actingAs($store->owner)
         ->get(route('overdue-accounts.index', ['sort' => 'full_name']))
         ->assertSessionHasErrors('sort');
 });

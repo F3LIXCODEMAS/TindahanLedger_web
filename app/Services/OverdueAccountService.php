@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\LedgerEntry;
+use App\Models\Store;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,7 +13,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class OverdueAccountService
 {
-    public function paginate(string $search, string $sort): LengthAwarePaginator
+    public function paginate(Store $store, string $search, string $sort): LengthAwarePaginator
     {
         $timezone = (string) config('app.timezone');
         $today = CarbonImmutable::now($timezone)->startOfDay();
@@ -37,6 +38,7 @@ class OverdueAccountService
 
         $customersQuery = Customer::query()
             ->select('customers.*')
+            ->where('customers.store_id', $store->getKey())
             ->selectSub($earliestOverdueDeadline, 'earliest_overdue_deadline')
             ->withSum('ledgerEntries as ledger_credit_total', 'amount')
             ->withSum('payments as customer_payment_total', 'amount')

@@ -2,9 +2,9 @@
 
 use App\Models\Customer;
 use App\Models\LedgerEntry;
+use App\Models\Store;
 use App\Models\StoreEmailSetting;
 use App\Models\SukiPoint;
-use App\Models\User;
 use App\Services\LedgerService;
 use App\Services\MailDeliveryService;
 use Illuminate\Support\Str;
@@ -18,7 +18,8 @@ it('redirects guests away from the record credit form and submission', function 
 });
 
 it('shows the form with the selected customer financial summary', function () {
-    $customer = Customer::factory()->create([
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create([
         'full_name' => 'Juan Dela Cruz',
         'contact_number' => '+639171234567',
         'credit_limit' => '5000.00',
@@ -28,7 +29,7 @@ it('shows the form with the selected customer financial summary', function () {
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get('/credits/create?customer_id='.$customer->id)
         ->assertOk()
         ->assertViewHas('selectedCustomerId', $customer->id)
@@ -37,7 +38,8 @@ it('shows the form with the selected customer financial summary', function () {
 });
 
 it('shows an add-customer empty state when no customers exist', function () {
-    $this->actingAs(User::factory()->create())
+    $store = Store::factory()->create();
+    $this->actingAs($store->owner)
         ->get('/credits/create')
         ->assertOk()
         ->assertSeeText('No customers available.')
@@ -46,10 +48,11 @@ it('shows an add-customer empty state when no customers exist', function () {
 });
 
 it('records credit with optional details and redirects to confirmation', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     $idempotencyKey = (string) Str::uuid();
 
-    $response = $this->actingAs(User::factory()->create())
+    $response = $this->actingAs($store->owner)
         ->post('/credits', [
             'customer_id' => $customer->id,
             'amount' => '500.00',
@@ -77,9 +80,10 @@ it('records credit with optional details and redirects to confirmation', functio
 });
 
 it('records credit without optional details or a repayment deadline', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '1000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '1000.00']);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->post('/credits', [
             'customer_id' => $customer->id,
             'amount' => '250.00',
@@ -96,7 +100,8 @@ it('records credit without optional details or a repayment deadline', function (
 });
 
 it('allows a credit exactly equal to available credit', function () {
-    $customer = Customer::factory()->create([
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create([
         'credit_limit' => '5000.00',
         'current_balance' => '0.00',
     ]);
@@ -105,7 +110,7 @@ it('allows a credit exactly equal to available credit', function () {
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->post('/credits', [
             'customer_id' => $customer->id,
             'amount' => '1000.00',
@@ -118,13 +123,14 @@ it('allows a credit exactly equal to available credit', function () {
 });
 
 it('hard-blocks credit above available credit and preserves entered values', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     app(LedgerService::class)->recordCredit($customer, [
         'amount' => '4000.00',
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->from('/credits/create?customer_id='.$customer->id)
         ->post('/credits', [
             'customer_id' => $customer->id,
@@ -143,14 +149,15 @@ it('hard-blocks credit above available credit and preserves entered values', fun
 });
 
 it('rejects missing and invalid customer or amount input', function (array $payload, array $invalidFields) {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
     $payload = array_merge([
         'customer_id' => $customer->id,
         'amount' => '10.00',
         'idempotency_key' => (string) Str::uuid(),
     ], $payload);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->from('/credits/create')
         ->post('/credits', $payload)
         ->assertRedirect('/credits/create')
@@ -168,9 +175,10 @@ it('rejects missing and invalid customer or amount input', function (array $payl
 ]);
 
 it('rejects an invalid optional repayment deadline', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->from('/credits/create')
         ->post('/credits', [
             'customer_id' => $customer->id,
@@ -185,9 +193,10 @@ it('rejects an invalid optional repayment deadline', function () {
 });
 
 it('returns the existing credit when a submission is repeated with the same key', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     $idempotencyKey = (string) Str::uuid();
-    $owner = User::factory()->create();
+    $owner = $store->owner;
     $payload = [
         'customer_id' => $customer->id,
         'amount' => '500.00',
@@ -205,13 +214,14 @@ it('returns the existing credit when a submission is repeated with the same key'
 });
 
 it('confirms the customer amount and resulting balance', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '1000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '1000.00']);
     $entry = app(LedgerService::class)->recordCredit($customer, [
         'amount' => '250.00',
         'repayment_deadline' => null,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('credits.confirmation', $entry))
         ->assertOk()
         ->assertSeeText('Credit Recorded')
@@ -223,7 +233,8 @@ it('confirms the customer amount and resulting balance', function () {
 });
 
 it('does not change Suki Points or cycle progress when recording credit', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     $sukiPoints = SukiPoint::factory()->for($customer)->create([
         'points_balance' => 8,
         'repayment_remainder_cents' => 6000,
@@ -232,7 +243,7 @@ it('does not change Suki Points or cycle progress when recording credit', functi
         'reward_eligible' => false,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->post('/credits', [
             'customer_id' => $customer->id,
             'amount' => '100.00',
@@ -247,9 +258,10 @@ it('does not change Suki Points or cycle progress when recording credit', functi
 });
 
 it('rolls back a credit if ledger persistence fails', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => 'customer@example.test',
         'credit_limit' => '1000.00',
     ]);

@@ -5,6 +5,7 @@ use App\Models\Customer;
 use App\Models\EmailReminderLog;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Models\Store;
 use App\Models\StoreEmailSetting;
 use App\Models\User;
 use App\Services\MailDeliveryService;
@@ -45,9 +46,9 @@ function captureReminderDeliveries(array $deliveryResults): Collection
     return $captured;
 }
 
-function createReminderEntry(?string $email, string $deadline, string $amount = '300.00'): array
+function createReminderEntry(?string $email, string $deadline, string $amount = '300.00', ?Store $store = null): array
 {
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store ?? Store::factory())->create([
         'email' => $email,
         'credit_limit' => '5000.00',
     ]);
@@ -62,9 +63,9 @@ function createReminderEntry(?string $email, string $deadline, string $amount = 
 
 it('sends a reminder with the outstanding balance after partial payments', function () {
     config(['app.timezone' => 'Asia/Manila']);
-    $owner = User::factory()->create();
-    StoreEmailSetting::factory()->for($owner)->create();
-    [$customer, $entry] = createReminderEntry('customer@example.test', '2026-10-20');
+    $store = Store::factory()->create();
+    StoreEmailSetting::factory()->for($store->owner)->create();
+    [$customer, $entry] = createReminderEntry('customer@example.test', '2026-10-20', store: $store);
     Payment::factory()->for($customer)->for($entry)->create(['amount' => '50.00']);
     $captured = captureReminderDeliveries([true]);
 
@@ -130,15 +131,15 @@ it('records missing and invalid customer email addresses as skipped', function (
     ]);
 });
 
-it('records sender configuration problems without selecting an arbitrary store account', function (
-    int $settingsCount,
+it('records store sender problems without sending from another store account', function (
+    Closure $arrangeStore,
     string $expectedReason,
 ) {
     config(['app.timezone' => 'Asia/Manila']);
-    for ($index = 0; $index < $settingsCount; $index++) {
-        StoreEmailSetting::factory()->for(User::factory()->create())->create();
-    }
-    createReminderEntry('customer@example.test', '2026-10-20');
+    StoreEmailSetting::factory()->for(Store::factory()->create()->owner)->create();
+    $store = Store::factory()->create();
+    $arrangeStore($store);
+    createReminderEntry('customer@example.test', '2026-10-20', store: $store);
     $deliveryService = Mockery::mock(MailDeliveryService::class)->makePartial();
     $deliveryService->shouldNotReceive('sendAsOwner');
     app()->instance(MailDeliveryService::class, $deliveryService);
@@ -153,15 +154,44 @@ it('records sender configuration problems without selecting an arbitrary store a
         'failure_reason' => $expectedReason,
     ]);
 })->with([
-    'sender not configured' => [0, 'sender_not_configured'],
-    'multiple accounts' => [2, 'multiple_store_email_settings'],
+    'store owner has no email settings' => [fn (Store $store) => null, 'sender_not_configured'],
+    'store is suspended' => [function (Store $store): void {
+        StoreEmailSetting::factory()->for($store->owner)->create();
+        $store->forceFill(['status' => Store::STATUS_SUSPENDED])->save();
+    }, 'store_unavailable'],
+    'store owner is deactivated' => [function (Store $store): void {
+        StoreEmailSetting::factory()->for($store->owner)->create();
+        $store->owner->forceFill(['status' => User::STATUS_INACTIVE])->save();
+    }, 'store_unavailable'],
 ]);
+
+it('sends each store reminder from that store owner account', function () {
+    config(['app.timezone' => 'Asia/Manila']);
+    $firstStore = Store::factory()->create();
+    $secondStore = Store::factory()->create();
+    StoreEmailSetting::factory()->for($firstStore->owner)->create();
+    StoreEmailSetting::factory()->for($secondStore->owner)->create();
+    createReminderEntry('first@example.test', '2026-10-20', store: $firstStore);
+    createReminderEntry('second@example.test', '2026-10-20', store: $secondStore);
+    $captured = captureReminderDeliveries([true, true]);
+
+    $summary = app(PaymentReminderService::class)->sendDueReminders(
+        CarbonImmutable::parse('2026-10-17', 'Asia/Manila'),
+    );
+
+    expect($summary)->toBe(['processed' => 2, 'sent' => 2, 'skipped' => 0, 'failed' => 0]);
+    expect($captured->mapWithKeys(fn (array $delivery): array => [$delivery['recipient'] => $delivery['owner']->id])->all())
+        ->toBe([
+            'first@example.test' => $firstStore->owner_user_id,
+            'second@example.test' => $secondStore->owner_user_id,
+        ]);
+});
 
 it('retries failed reminders and never resends a successful trigger', function () {
     config(['app.timezone' => 'Asia/Manila']);
-    $owner = User::factory()->create();
-    StoreEmailSetting::factory()->for($owner)->create();
-    [$customer] = createReminderEntry('customer@example.test', '2026-10-20');
+    $store = Store::factory()->create();
+    StoreEmailSetting::factory()->for($store->owner)->create();
+    [$customer] = createReminderEntry('customer@example.test', '2026-10-20', store: $store);
     $captured = captureReminderDeliveries([false, true]);
     $service = app(PaymentReminderService::class);
     $today = CarbonImmutable::parse('2026-10-17', 'Asia/Manila');
@@ -186,9 +216,9 @@ it('retries failed reminders and never resends a successful trigger', function (
 it('recovers a reminder left in sending status after a process interruption', function () {
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(CarbonImmutable::parse('2026-10-17 08:05:00', 'Asia/Manila'));
-    $owner = User::factory()->create();
-    StoreEmailSetting::factory()->for($owner)->create();
-    [$customer, $entry] = createReminderEntry('customer@example.test', '2026-10-20');
+    $store = Store::factory()->create();
+    StoreEmailSetting::factory()->for($store->owner)->create();
+    [$customer, $entry] = createReminderEntry('customer@example.test', '2026-10-20', store: $store);
     EmailReminderLog::factory()->forLedgerEntry($entry)->create([
         'reminder_type' => EmailReminderLog::TYPE_ADVANCE,
         'scheduled_reminder_date' => '2026-10-17',
@@ -242,10 +272,10 @@ it('does not process a reminder while its previous send attempt is still active'
 
 it('continues processing other reminders after one delivery fails', function () {
     config(['app.timezone' => 'Asia/Manila']);
-    $owner = User::factory()->create();
-    StoreEmailSetting::factory()->for($owner)->create();
-    createReminderEntry('first@example.test', '2026-10-20');
-    createReminderEntry('second@example.test', '2026-10-20');
+    $store = Store::factory()->create();
+    StoreEmailSetting::factory()->for($store->owner)->create();
+    createReminderEntry('first@example.test', '2026-10-20', store: $store);
+    createReminderEntry('second@example.test', '2026-10-20', store: $store);
     $captured = captureReminderDeliveries([false, true]);
 
     $summary = app(PaymentReminderService::class)->sendDueReminders(
@@ -260,9 +290,9 @@ it('continues processing other reminders after one delivery fails', function () 
 
 it('uses the configured timezone when determining the scheduled calendar date', function () {
     config(['app.timezone' => 'Asia/Manila']);
-    $owner = User::factory()->create();
-    StoreEmailSetting::factory()->for($owner)->create();
-    createReminderEntry('customer@example.test', '2026-10-21');
+    $store = Store::factory()->create();
+    StoreEmailSetting::factory()->for($store->owner)->create();
+    createReminderEntry('customer@example.test', '2026-10-21', store: $store);
     captureReminderDeliveries([true]);
 
     $summary = app(PaymentReminderService::class)->sendDueReminders(

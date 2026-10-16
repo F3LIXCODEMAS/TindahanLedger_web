@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\PaymentExceedsBalance;
+use App\Exceptions\StoreSuspended;
 use App\Http\Requests\StorePaymentRequest;
 use App\Mail\PaymentReceipt as PaymentReceiptEmail;
 use App\Models\Customer;
@@ -14,6 +15,7 @@ use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
@@ -22,7 +24,7 @@ class PaymentController extends Controller
 {
     public function create(Request $request, LedgerService $ledgerService): View
     {
-        $customers = Customer::query()
+        $customers = $request->user()->store->customers()
             ->orderBy('full_name')
             ->orderBy('id')
             ->get(['id', 'full_name', 'contact_number', 'credit_limit']);
@@ -44,6 +46,8 @@ class PaymentController extends Controller
 
     public function customerSummary(Customer $customer, LedgerService $ledgerService): JsonResponse
     {
+        Gate::authorize('view', $customer);
+
         return response()->json($ledgerService->financialSummary($customer));
     }
 
@@ -55,7 +59,7 @@ class PaymentController extends Controller
         $validated = $request->validated();
 
         try {
-            $customer = Customer::query()->findOrFail($validated['customer_id']);
+            $customer = $request->user()->store->customers()->findOrFail($validated['customer_id']);
             $receipt = $ledgerService->recordCustomerPayment($customer, [
                 'amount' => $validated['amount'],
                 'note' => $validated['note'] ?? null,
@@ -63,6 +67,8 @@ class PaymentController extends Controller
             ]);
         } catch (PaymentExceedsBalance $exception) {
             return back()->withInput()->withErrors(['amount' => $exception->getMessage()]);
+        } catch (StoreSuspended $exception) {
+            return redirect()->route('dashboard')->withErrors(['store' => $exception->getMessage()]);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -102,10 +108,11 @@ class PaymentController extends Controller
             ]);
     }
 
-    public function confirmation(string $paymentBatchId, LedgerService $ledgerService): View
+    public function confirmation(Request $request, string $paymentBatchId, LedgerService $ledgerService): View
     {
         $payments = Payment::query()
             ->with('customer')
+            ->whereRelation('customer', 'store_id', $request->user()->store->getKey())
             ->where('payment_batch_id', $paymentBatchId)
             ->orderBy('id')
             ->get();

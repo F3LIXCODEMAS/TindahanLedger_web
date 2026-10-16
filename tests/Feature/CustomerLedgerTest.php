@@ -3,8 +3,8 @@
 use App\Models\Customer;
 use App\Models\EmailReminderLog;
 use App\Models\LedgerEntry;
+use App\Models\Store;
 use App\Models\SukiPoint;
-use App\Models\User;
 use App\Services\LedgerService;
 use Illuminate\Support\Carbon;
 
@@ -14,14 +14,16 @@ test('the root redirects guests to login', function () {
 });
 
 it('redirects guests away from a customer ledger', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
 
     $this->get(route('customers.show', $customer))
         ->assertRedirect(route('login'));
 });
 
 it('shows customer details and zero-value ledger state when there is no history', function () {
-    $customer = Customer::factory()->create([
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create([
         'full_name' => 'Juan Dela Cruz',
         'contact_number' => '+639171234567',
         'email' => 'juan@example.test',
@@ -29,7 +31,7 @@ it('shows customer details and zero-value ledger state when there is no history'
         'credit_limit' => '5000.00',
     ]);
 
-    $response = $this->actingAs(User::factory()->create())
+    $response = $this->actingAs($store->owner)
         ->get(route('customers.show', $customer));
 
     $response->assertOk()
@@ -51,8 +53,9 @@ it('shows customer details and zero-value ledger state when there is no history'
 });
 
 it('shows chronological credits and payments with cumulative running balances', function () {
+    $store = Store::factory()->create();
     $this->travelTo(Carbon::parse('2026-10-01 12:00:00'));
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     $ledgerService = app(LedgerService::class);
 
     $firstCredit = $ledgerService->recordCredit($customer, [
@@ -70,7 +73,7 @@ it('shows chronological credits and payments with cumulative running balances', 
     ]);
     $ledgerService->recordPayment($secondCredit, '150.00', '2026-10-01');
 
-    $response = $this->actingAs(User::factory()->create())
+    $response = $this->actingAs($store->owner)
         ->get(route('customers.show', $customer));
 
     $response->assertOk()
@@ -95,8 +98,9 @@ it('shows chronological credits and payments with cumulative running balances', 
 });
 
 it('marks only unpaid past-deadline credit as overdue', function () {
+    $store = Store::factory()->create();
     $this->travelTo(Carbon::parse('2026-10-01 12:00:00'));
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     $ledgerService = app(LedgerService::class);
 
     $partiallyPaidOverdue = $ledgerService->recordCredit($customer, [
@@ -119,7 +123,7 @@ it('marks only unpaid past-deadline credit as overdue', function () {
         'repayment_deadline' => '2026-10-05',
     ]);
 
-    $response = $this->actingAs(User::factory()->create())
+    $response = $this->actingAs($store->owner)
         ->get(route('customers.show', $customer));
 
     $response->assertOk()
@@ -140,13 +144,14 @@ it('marks only unpaid past-deadline credit as overdue', function () {
 });
 
 it('never reports negative available credit when debt exceeds the limit', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '500.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '500.00']);
     LedgerEntry::factory()->for($customer)->create([
         'amount' => '700.00',
         'running_balance' => '700.00',
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('customers.show', $customer))
         ->assertOk()
         ->assertViewHas('ledger', fn (array $ledger): bool => $ledger['outstanding_balance'] === '700.00'
@@ -155,9 +160,10 @@ it('never reports negative available credit when debt exceeds the limit', functi
 });
 
 it('links each customer record to its ledger page', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('customers.index'))
         ->assertOk()
         ->assertSeeText('Open ledger')
@@ -165,7 +171,8 @@ it('links each customer record to its ledger page', function () {
 });
 
 it('keeps points carry-forward separate from completed cycle reward progress', function () {
-    $customer = Customer::factory()->create(['credit_limit' => '5000.00']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     SukiPoint::factory()->for($customer)->create([
         'points_balance' => 10,
         'repayment_remainder_cents' => 3000,
@@ -174,7 +181,7 @@ it('keeps points carry-forward separate from completed cycle reward progress', f
         'reward_eligible' => false,
     ]);
 
-    $response = $this->actingAs(User::factory()->create())
+    $response = $this->actingAs($store->owner)
         ->get(route('customers.show', $customer));
 
     $response->assertOk()
@@ -185,7 +192,8 @@ it('keeps points carry-forward separate from completed cycle reward progress', f
 });
 
 it('shows the three-cycle reward as achieved without resetting points', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
     SukiPoint::factory()->for($customer)->create([
         'points_balance' => 10,
         'repayment_remainder_cents' => 7000,
@@ -194,7 +202,7 @@ it('shows the three-cycle reward as achieved without resetting points', function
         'reward_eligible' => true,
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('customers.show', $customer))
         ->assertOk()
         ->assertSeeText('10')
@@ -204,7 +212,8 @@ it('shows the three-cycle reward as achieved without resetting points', function
 });
 
 it('shows only the selected customer repayment reminder history', function () {
-    $customer = Customer::factory()->create();
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->create();
     $entry = LedgerEntry::factory()->for($customer)->create([
         'amount' => '250.00',
         'running_balance' => '250.00',
@@ -219,7 +228,7 @@ it('shows only the selected customer repayment reminder history', function () {
         'failure_reason' => 'email_delivery_failed',
     ]);
 
-    $otherCustomer = Customer::factory()->create();
+    $otherCustomer = Customer::factory()->for($store)->create();
     $otherEntry = LedgerEntry::factory()->for($otherCustomer)->create([
         'amount' => '9999.99',
         'running_balance' => '9999.99',
@@ -231,7 +240,7 @@ it('shows only the selected customer repayment reminder history', function () {
         'outstanding_amount' => '9999.99',
     ]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs($store->owner)
         ->get(route('customers.show', $customer))
         ->assertOk()
         ->assertSeeText('Repayment reminder history')
@@ -242,7 +251,8 @@ it('shows only the selected customer repayment reminder history', function () {
 });
 
 it('returns a friendly not-found page for an unknown customer', function () {
-    $this->actingAs(User::factory()->create())
+    $store = Store::factory()->create();
+    $this->actingAs($store->owner)
         ->get(route('customers.show', 999999))
         ->assertNotFound()
         ->assertSeeText('Customer not found.');
