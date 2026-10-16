@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Owner Sign In | {{ config('app.name', 'TindahanLedger') }}</title>
+    <title>Sign In | {{ config('app.name', 'TindahanLedger') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="owner-auth-page">
     <main class="auth-shell">
         <div class="auth-panel">
             <section class="auth-intro" aria-labelledby="brand-title">
-                <a class="brand-lockup" href="{{ route('login') }}" aria-label="TindahanLedger owner sign in">
+                <a class="brand-lockup" href="{{ route('login') }}" aria-label="TindahanLedger sign in">
                     <span class="brand-mark" aria-hidden="true">TL</span>
                     <span class="brand-name">TindahanLedger</span>
                 </a>
@@ -30,7 +30,7 @@
 
             <section class="auth-form-section" aria-labelledby="login-title">
                 <div class="form-heading">
-                    <p class="eyebrow">OWNER SIGN IN</p>
+                    <p class="eyebrow">SIGN IN</p>
                     <h2 id="login-title">Welcome back</h2>
                     <p>Sign in with your account username and password.</p>
                 </div>

@@ -1,6 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\StoreController;
+use App\Http\Controllers\Admin\StoreCustomerController;
+use App\Http\Controllers\Admin\StoreOwnerController;
+use App\Http\Controllers\Admin\StoreStatusController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\UserPasswordController;
+use App\Http\Controllers\Admin\UserStatusController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\CreditController;
@@ -31,6 +38,17 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_SUPER_ADMIN])
     ->name('admin.')
     ->group(function () {
         Route::get('/', AdminDashboardController::class)->name('dashboard');
+
+        Route::resource('stores', StoreController::class)->except(['destroy']);
+        Route::patch('/stores/{store}/status', [StoreStatusController::class, 'update'])->name('stores.status.update');
+        Route::patch('/stores/{store}/owner', [StoreOwnerController::class, 'update'])->name('stores.owner.update');
+        Route::get('/stores/{store}/customers/{customer}', [StoreCustomerController::class, 'show'])
+            ->scopeBindings()
+            ->name('stores.customers.show');
+
+        Route::resource('users', UserController::class)->only(['index', 'create', 'store', 'show']);
+        Route::patch('/users/{user}/status', [UserStatusController::class, 'update'])->name('users.status.update');
+        Route::put('/users/{user}/password', [UserPasswordController::class, 'update'])->name('users.password.update');
     });
 
 Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])->group(function () {

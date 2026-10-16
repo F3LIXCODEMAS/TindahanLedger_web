@@ -3,11 +3,11 @@
 use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
 
-it('shows the owner login form to guests', function () {
+it('shows the login form to guests', function () {
     $this->get('/login')
         ->assertOk()
         ->assertSee('TindahanLedger')
-        ->assertSee('Owner Sign In')
+        ->assertSee('Sign In')
         ->assertSee('name="username"', false)
         ->assertSee('csrf-token', false);
 });
