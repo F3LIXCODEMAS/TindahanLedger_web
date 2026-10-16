@@ -15,6 +15,7 @@
 
         <nav class="owner-navigation" aria-label="Owner navigation">
             <a class="owner-nav-link is-current" href="{{ route('dashboard') }}" aria-current="page">Dashboard</a>
+            <a class="owner-nav-link" href="{{ route('overdue-accounts.index') }}">Overdue accounts</a>
             <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
             <a class="owner-nav-link" href="{{ route('password.edit') }}">Change password</a>
             <span class="owner-name">{{ auth()->user()->name }}</span>
@@ -32,6 +33,16 @@
             <p>Current balances and recent ledger activity.</p>
         </header>
 
+        @if (session('status'))
+            <p class="status-banner" role="status">{{ session('status') }}</p>
+        @endif
+
+        @if ($storeIsSuspended)
+            <p class="status-banner" role="alert">
+                {{ $errors->first('store') ?: 'This store is suspended. Records are read-only until an administrator reactivates it.' }}
+            </p>
+        @endif
+
         <section class="dashboard-metrics" aria-label="Store summary">
             <article class="metric-panel metric-collectibles" aria-labelledby="collectibles-title">
                 <div class="metric-label-row">
@@ -48,7 +59,7 @@
                     <span class="overdue-mark" aria-hidden="true"></span>
                 </div>
                 <p class="metric-value">{{ $overdueAccountCount }}</p>
-                <p class="metric-note">Customers with past-due balances</p>
+                <a class="metric-note overdue-metric-link" href="{{ route('overdue-accounts.index') }}">Review overdue customers</a>
             </article>
         </section>
 

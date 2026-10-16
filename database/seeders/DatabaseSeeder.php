@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Customer;
+use App\Models\Store;
 use App\Models\User;
 use App\Services\LedgerService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -16,6 +16,9 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Each demo store owner logs in with the store name as their username and
+     * the DEMO_OWNER_PASSWORD value as their password.
      */
     public function run(): void
     {
@@ -29,67 +32,125 @@ class DatabaseSeeder extends Seeder
             throw new RuntimeException('Set DEMO_OWNER_PASSWORD in .env before running the demo seeder.');
         }
 
-        $owner = User::query()->firstOrNew(['email' => 'felix@gmail.com']);
+        $ledgerService = app(LedgerService::class);
 
-        if (! $owner->exists) {
-            $owner = User::query()->firstOrNew(['email' => 'owner@example.com']);
+        foreach ($this->demoStores() as $demoStore) {
+            $owner = $this->seedOwner($demoStore['owner'], $demoStore['store_name'], $ownerPassword);
+            $store = $this->seedStore($owner, $demoStore['store_name']);
+
+            foreach ($demoStore['scenarios'] as $scenario) {
+                DB::transaction(function () use ($store, $scenario, $ledgerService): void {
+                    $customer = $store->customers()->firstOrCreate(
+                        ['contact_number' => $scenario['customer']['contact_number']],
+                        $scenario['customer'],
+                    );
+
+                    if ($customer->ledgerEntries()->exists()) {
+                        return;
+                    }
+
+                    foreach ($scenario['entries'] as [$amount, $items, $deadlineDays, $paymentAmount]) {
+                        $entry = $ledgerService->recordCredit($customer, [
+                            'amount' => $amount,
+                            'itemized_list' => $items,
+                            'transaction_date' => now()->subDays(max(0, -$deadlineDays + 5))->toDateString(),
+                            'repayment_deadline' => now()->addDays($deadlineDays)->toDateString(),
+                        ]);
+
+                        if ($paymentAmount > 0) {
+                            $ledgerService->recordPayment($entry, $paymentAmount, now()->subDays(2)->toDateString());
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * @param  array{name: string, email: string, legacy_email?: string}  $ownerDetails
+     */
+    private function seedOwner(array $ownerDetails, string $storeName, string $ownerPassword): User
+    {
+        $owner = User::query()->firstOrNew(['email' => $ownerDetails['email']]);
+
+        if (! $owner->exists && isset($ownerDetails['legacy_email'])) {
+            $owner = User::query()->firstOrNew(['email' => $ownerDetails['legacy_email']]);
         }
 
         $owner->fill([
-            'name' => 'Felix',
-            'email' => 'felix@gmail.com',
+            'name' => $ownerDetails['name'],
+            'username' => $storeName,
+            'email' => $ownerDetails['email'],
             'password' => $ownerPassword,
+        ])->forceFill([
+            'role' => User::ROLE_STORE_OWNER,
+            'status' => User::STATUS_ACTIVE,
         ])->save();
 
-        $ledgerService = app(LedgerService::class);
+        return $owner;
+    }
 
-        $scenarios = [
+    private function seedStore(User $owner, string $storeName): Store
+    {
+        $store = Store::query()->firstOrNew(['owner_user_id' => $owner->getKey()]);
+        $store->fill(['store_name' => $storeName])->forceFill([
+            'owner_user_id' => $owner->getKey(),
+            'status' => Store::STATUS_ACTIVE,
+        ])->save();
+
+        return $store;
+    }
+
+    /**
+     * @return list<array{
+     *     store_name: string,
+     *     owner: array{name: string, email: string, legacy_email?: string},
+     *     scenarios: list<array{customer: array<string, mixed>, entries: list<array{0: int, 1: list<string>, 2: int, 3: int}>}>
+     * }>
+     */
+    private function demoStores(): array
+    {
+        return [
             [
-                'customer' => ['full_name' => 'Maria Santos', 'contact_number' => '09171234567', 'email' => 'maria.santos@example.test', 'residential_landmark' => 'Near Mabini Elementary School', 'credit_limit' => 5000],
-                'entries' => [[850, ['Rice 5kg', 'Cooking oil'], 7, 850]],
+                'store_name' => 'Mang Arthur Store',
+                'owner' => ['name' => 'Felix', 'email' => 'felix@gmail.com', 'legacy_email' => 'owner@example.com'],
+                'scenarios' => [
+                    [
+                        'customer' => ['full_name' => 'Maria Santos', 'contact_number' => '09171234567', 'email' => 'maria.santos@example.test', 'residential_landmark' => 'Near Mabini Elementary School', 'credit_limit' => 5000],
+                        'entries' => [[850, ['Rice 5kg', 'Cooking oil'], 7, 850]],
+                    ],
+                    [
+                        'customer' => ['full_name' => 'Jose Dela Cruz', 'contact_number' => '09181234567', 'email' => 'jose.delacruz@example.test', 'residential_landmark' => 'Beside the barangay hall', 'credit_limit' => 6000],
+                        'entries' => [[2400, ['Grocery items', 'Laundry soap'], 14, 900]],
+                    ],
+                    [
+                        'customer' => ['full_name' => 'Liza Reyes', 'contact_number' => '09191234567', 'email' => 'liza.reyes@example.test', 'residential_landmark' => 'Across the covered court', 'credit_limit' => 3000],
+                        'entries' => [[1200, ['School supplies'], -20, 0]],
+                    ],
+                    [
+                        'customer' => ['full_name' => 'Ramon Garcia', 'contact_number' => '09201234567', 'email' => 'ramon.garcia@example.test', 'residential_landmark' => 'Near the public market', 'credit_limit' => 10000],
+                        'entries' => [[1800, ['Construction supplies'], -5, 800], [700, ['Household items'], 10, 0]],
+                    ],
+                    [
+                        'customer' => ['full_name' => 'Ana Villanueva', 'contact_number' => '09211234567', 'email' => 'ana.villanueva@example.test', 'residential_landmark' => 'Behind the health center', 'credit_limit' => 4000],
+                        'entries' => [[600, ['Rice and canned goods'], -30, 600], [900, ['Baby supplies'], -10, 900], [500, ['Coffee and snacks'], 15, 0]],
+                    ],
+                ],
             ],
             [
-                'customer' => ['full_name' => 'Jose Dela Cruz', 'contact_number' => '09181234567', 'email' => 'jose.delacruz@example.test', 'residential_landmark' => 'Beside the barangay hall', 'credit_limit' => 6000],
-                'entries' => [[2400, ['Grocery items', 'Laundry soap'], 14, 900]],
-            ],
-            [
-                'customer' => ['full_name' => 'Liza Reyes', 'contact_number' => '09191234567', 'email' => 'liza.reyes@example.test', 'residential_landmark' => 'Across the covered court', 'credit_limit' => 3000],
-                'entries' => [[1200, ['School supplies'], -20, 0]],
-            ],
-            [
-                'customer' => ['full_name' => 'Ramon Garcia', 'contact_number' => '09201234567', 'email' => 'ramon.garcia@example.test', 'residential_landmark' => 'Near the public market', 'credit_limit' => 10000],
-                'entries' => [[1800, ['Construction supplies'], -5, 800], [700, ['Household items'], 10, 0]],
-            ],
-            [
-                'customer' => ['full_name' => 'Ana Villanueva', 'contact_number' => '09211234567', 'email' => 'ana.villanueva@example.test', 'residential_landmark' => 'Behind the health center', 'credit_limit' => 4000],
-                'entries' => [[600, ['Rice and canned goods'], -30, 600], [900, ['Baby supplies'], -10, 900], [500, ['Coffee and snacks'], 15, 0]],
+                'store_name' => 'Aling Nena Store',
+                'owner' => ['name' => 'Nena', 'email' => 'aling.nena@example.test'],
+                'scenarios' => [
+                    [
+                        'customer' => ['full_name' => 'Pedro Bautista', 'contact_number' => '09221234567', 'email' => 'pedro.bautista@example.test', 'residential_landmark' => 'Near the chapel', 'credit_limit' => 4000],
+                        'entries' => [[1500, ['Rice 10kg'], -12, 500]],
+                    ],
+                    [
+                        'customer' => ['full_name' => 'Carmen Lopez', 'contact_number' => '09231234567', 'email' => 'carmen.lopez@example.test', 'residential_landmark' => 'Beside the water station', 'credit_limit' => 3000],
+                        'entries' => [[650, ['Canned goods'], 5, 650]],
+                    ],
+                ],
             ],
         ];
-
-        foreach ($scenarios as $scenario) {
-            DB::transaction(function () use ($scenario, $ledgerService): void {
-                $customer = Customer::query()->firstOrCreate(
-                    ['contact_number' => $scenario['customer']['contact_number']],
-                    $scenario['customer'],
-                );
-
-                if ($customer->ledgerEntries()->exists()) {
-                    return;
-                }
-
-                foreach ($scenario['entries'] as [$amount, $items, $deadlineDays, $paymentAmount]) {
-                    $entry = $ledgerService->recordCredit($customer, [
-                        'amount' => $amount,
-                        'itemized_list' => $items,
-                        'transaction_date' => now()->subDays(max(0, -$deadlineDays + 5))->toDateString(),
-                        'repayment_deadline' => now()->addDays($deadlineDays)->toDateString(),
-                    ]);
-
-                    if ($paymentAmount > 0) {
-                        $ledgerService->recordPayment($entry, $paymentAmount, now()->subDays(2)->toDateString());
-                    }
-                }
-            });
-        }
     }
 }

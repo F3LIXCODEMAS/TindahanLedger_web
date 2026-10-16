@@ -17,21 +17,19 @@ if (passwordToggle instanceof HTMLButtonElement && passwordInput instanceof HTML
 const loginForm = document.querySelector('[data-login-form]');
 
 if (loginForm instanceof HTMLFormElement) {
-	const emailInput = loginForm.querySelector('#email');
+	const usernameInput = loginForm.querySelector('#username');
 	const submitButton = loginForm.querySelector('[data-login-submit]');
 	const submitLabel = loginForm.querySelector('[data-submit-label]');
 	const loadingLabel = loginForm.querySelector('[data-loading-label]');
 
-	if (emailInput instanceof HTMLInputElement) {
-		emailInput.addEventListener('invalid', () => {
-			if (emailInput.validity.valueMissing) {
-				emailInput.setCustomValidity('Please enter your email.');
-			} else if (emailInput.validity.typeMismatch) {
-				emailInput.setCustomValidity('Please enter a valid email address.');
+	if (usernameInput instanceof HTMLInputElement) {
+		usernameInput.addEventListener('invalid', () => {
+			if (usernameInput.validity.valueMissing) {
+				usernameInput.setCustomValidity('Please enter your username.');
 			}
 		});
 
-		emailInput.addEventListener('input', () => emailInput.setCustomValidity(''));
+		usernameInput.addEventListener('input', () => usernameInput.setCustomValidity(''));
 	}
 
 	if (passwordInput instanceof HTMLInputElement) {
@@ -299,3 +297,11 @@ if (paymentForm instanceof HTMLFormElement) {
 		}
 	});
 }
+
+document.addEventListener('submit', (event) => {
+	const form = event.target;
+
+	if (form instanceof HTMLFormElement && form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+		event.preventDefault();
+	}
+});

@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Customer;
 use App\Models\EmailReminderLog;
 use App\Models\LedgerEntry;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -20,8 +19,10 @@ class EmailReminderLogFactory extends Factory
     public function definition(): array
     {
         return [
-            'customer_id' => Customer::factory(),
             'ledger_entry_id' => LedgerEntry::factory(),
+            'customer_id' => fn (array $attributes): int => LedgerEntry::query()
+                ->whereKey($attributes['ledger_entry_id'])
+                ->value('customer_id'),
             'reminder_type' => EmailReminderLog::TYPE_DUE_DATE,
             'scheduled_reminder_date' => now()->toDateString(),
             'repayment_deadline' => now()->toDateString(),

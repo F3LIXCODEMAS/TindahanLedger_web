@@ -4,6 +4,7 @@ use App\Mail\CreditEntryReceipt;
 use App\Mail\PaymentReceipt;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
+use App\Models\Store;
 use App\Models\StoreEmailSetting;
 use App\Models\User;
 use App\Services\LedgerService;
@@ -43,9 +44,10 @@ function expectReceiptDelivery(
 }
 
 it('sends an itemized credit receipt with its saved amount and resulting balance', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create(['store_name' => 'Aling Nena Store']);
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => 'customer@example.test',
         'credit_limit' => '1000.00',
     ]);
@@ -76,9 +78,10 @@ it('sends an itemized credit receipt with its saved amount and resulting balance
 });
 
 it('sends a credit receipt without an empty items section when items were not provided', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => 'customer@example.test',
         'credit_limit' => '1000.00',
     ]);
@@ -101,9 +104,10 @@ it('sends partial and full payment receipts with the resulting balance', functio
     string $remainingBalance,
     bool $debtCycleCompleted,
 ) {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create(['store_name' => 'Aling Nena Store']);
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => 'customer@example.test',
         'credit_limit' => '1000.00',
     ]);
@@ -141,9 +145,10 @@ it('sends partial and full payment receipts with the resulting balance', functio
 ]);
 
 it('skips receipts for customers with missing or legacy invalid email addresses', function (?string $email) {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => $email,
         'credit_limit' => '1000.00',
     ]);
@@ -160,9 +165,10 @@ it('skips receipts for customers with missing or legacy invalid email addresses'
 ]);
 
 it('does not send duplicate credit receipts when an idempotent request is repeated', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => 'customer@example.test',
         'credit_limit' => '1000.00',
     ]);
@@ -182,9 +188,10 @@ it('does not send duplicate credit receipts when an idempotent request is repeat
 });
 
 it('does not send duplicate payment receipts when an idempotent request is repeated', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => 'customer@example.test',
         'credit_limit' => '1000.00',
     ]);
@@ -205,9 +212,10 @@ it('does not send duplicate payment receipts when an idempotent request is repea
 });
 
 it('keeps a saved credit when the receipt mail transport fails', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => 'customer@example.test',
         'credit_limit' => '1000.00',
     ]);
@@ -226,7 +234,8 @@ it('keeps a saved credit when the receipt mail transport fails', function () {
 });
 
 it('renders an optional credit receipt note only when provided', function () {
-    $customer = Customer::factory()->make(['full_name' => 'Juan Customer']);
+    $store = Store::factory()->create();
+    $customer = Customer::factory()->for($store)->make(['full_name' => 'Juan Customer']);
     $entry = LedgerEntry::factory()->make([
         'amount' => '20.00',
         'running_balance' => '20.00',
@@ -240,13 +249,14 @@ it('renders an optional credit receipt note only when provided', function () {
 });
 
 it('uses the store identity and saved Gmail account for credit receipts', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create([
         'store_name' => 'Aling Nena Store',
         'sender_email' => 'nena@gmail.com',
         'smtp_app_password' => 'private-app-password',
     ]);
-    $customer = Customer::factory()->create(['email' => 'customer@example.test']);
+    $customer = Customer::factory()->for($store)->create(['email' => 'customer@example.test']);
     $entry = app(LedgerService::class)->recordCredit($customer, ['amount' => '25.00']);
     $sentReceipt = null;
     $mailer = Mockery::mock();
@@ -278,12 +288,13 @@ it('uses the store identity and saved Gmail account for credit receipts', functi
 });
 
 it('skips missing or malformed recipients before creating an owner mailer', function (?string $recipient) {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     Mail::shouldReceive('build')->never();
 
     $sent = app(MailDeliveryService::class)->sendAsOwner(
         $owner,
-        new CreditEntryReceipt(Customer::factory()->make(), LedgerEntry::factory()->make()),
+        new CreditEntryReceipt(Customer::factory()->for($store)->make(), LedgerEntry::factory()->make()),
         $recipient,
         'credit_receipt',
     );
@@ -296,9 +307,10 @@ it('skips missing or malformed recipients before creating an owner mailer', func
 ]);
 
 it('logs receipt delivery failures and returns false without exposing recipient details', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create(['email' => 'customer@example.test']);
+    $customer = Customer::factory()->for($store)->create(['email' => 'customer@example.test']);
     $entry = app(LedgerService::class)->recordCredit($customer, ['amount' => '25.00']);
     Mail::shouldReceive('build')
         ->once()
@@ -324,9 +336,10 @@ it('logs receipt delivery failures and returns false without exposing recipient 
 });
 
 it('records a payment when the customer has no email address', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
-    $customer = Customer::factory()->create([
+    $customer = Customer::factory()->for($store)->create([
         'email' => null,
         'credit_limit' => '1000.00',
     ]);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,39 +20,68 @@ class AuthenticatedSessionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
+        $validated = $request->validate([
+            'username' => ['required', 'string', 'max:120'],
             'password' => ['required', 'string'],
         ], [
-            'email.required' => 'Please enter your email.',
-            'email.email' => 'Please enter a valid email address.',
+            'username.required' => 'Please enter your username.',
+            'username.max' => 'The username may not exceed 120 characters.',
             'password.required' => 'Please enter your password.',
         ]);
 
-        $throttleKey = Str::transliterate(Str::lower($credentials['email']).'|'.$request->ip());
+        $credentials = [
+            'username' => User::normalizeUsername($validated['username']),
+            'password' => $validated['password'],
+        ];
+        $throttleKey = Str::transliterate($credentials['username'].'|'.$request->ip());
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $secondsUntilRetry = RateLimiter::availableIn($throttleKey);
 
             return back()
-                ->withInput($request->only('email'))
+                ->withInput($request->only('username'))
                 ->withErrors([
-                    'email' => "Too many login attempts. Please wait {$secondsUntilRetry} seconds and try again.",
+                    'username' => "Too many login attempts. Please wait {$secondsUntilRetry} seconds and try again.",
                 ]);
         }
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        $accountIsInactive = false;
+        $authenticated = Auth::attemptWhen(
+            $credentials,
+            function (User $user) use (&$accountIsInactive): bool {
+                $accountIsInactive = ! $user->isActive();
+
+                return ! $accountIsInactive;
+            },
+            $request->boolean('remember'),
+        );
+
+        if (! $authenticated) {
             RateLimiter::hit($throttleKey, 60);
 
             return back()
-                ->withInput($request->only('email'))
+                ->withInput($request->only('username'))
                 ->withErrors([
-                    'email' => 'The email or password you entered is incorrect.',
+                    'username' => $accountIsInactive
+                        ? 'This account has been deactivated. Please contact the administrator.'
+                        : 'The username or password you entered is incorrect.',
                 ]);
         }
 
         RateLimiter::clear($throttleKey);
         $request->session()->regenerate();
+
+        $user = $request->user();
+        $user->forceFill(['last_login_at' => now()])->save();
+
+        if ($user->must_change_password) {
+            return redirect()->route('password.edit')
+                ->with('status', 'Please choose a new password before continuing.');
+        }
+
+        if ($user->isSuperAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
 
         return redirect()->intended(route('dashboard'));
     }

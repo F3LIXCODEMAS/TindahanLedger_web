@@ -1,8 +1,8 @@
 <?php
 
 use App\Mail\ReusableEmail;
+use App\Models\Store;
 use App\Models\StoreEmailSetting;
-use App\Models\User;
 use App\Services\MailDeliveryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -14,7 +14,8 @@ it('requires an authenticated owner to access email settings', function () {
 });
 
 it('shows the email settings form and app password guide to the owner', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
 
     $this->actingAs($owner)
@@ -29,7 +30,8 @@ it('shows the email settings form and app password guide to the owner', function
 });
 
 it('saves an owner email configuration with an encrypted app password', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
 
     $this->actingAs($owner)
         ->put(route('email-settings.update'), [
@@ -53,7 +55,8 @@ it('saves an owner email configuration with an encrypted app password', function
 });
 
 it('keeps the existing encrypted app password when the owner edits other settings', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     $settings = StoreEmailSetting::factory()->for($owner)->create([
         'store_name' => 'Old Store Name',
         'sender_email' => 'old@gmail.com',
@@ -74,7 +77,8 @@ it('keeps the existing encrypted app password when the owner edits other setting
 });
 
 it('never renders a saved app password in the settings page', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create([
         'smtp_app_password' => 'never-render-this-secret',
     ]);
@@ -86,7 +90,8 @@ it('never renders a saved app password in the settings page', function () {
 });
 
 it('rejects an invalid sender email and does not flash the app password', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
 
     $this->actingAs($owner)
         ->from(route('email-settings.edit'))
@@ -103,7 +108,8 @@ it('rejects an invalid sender email and does not flash the app password', functi
 });
 
 it('requires an app password when creating the first email configuration', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
 
     $this->actingAs($owner)
         ->from(route('email-settings.edit'))
@@ -120,7 +126,8 @@ it('requires an app password when creating the first email configuration', funct
 });
 
 it('rejects line breaks in the store name used as the email sender name', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
 
     $this->actingAs($owner)
         ->from(route('email-settings.edit'))
@@ -138,7 +145,8 @@ it('rejects line breaks in the store name used as the email sender name', functi
 });
 
 it('sends a test email to the saved Gmail address using that owner configuration', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     $settings = StoreEmailSetting::factory()->for($owner)->create([
         'store_name' => 'Aling Nena Store',
         'sender_email' => 'nena@gmail.com',
@@ -174,7 +182,8 @@ it('sends a test email to the saved Gmail address using that owner configuration
 });
 
 it('shows an error instead of a success message when the test email cannot be sent', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
     $delivery = Mockery::mock(MailDeliveryService::class);
     $delivery->shouldReceive('sendWithGmail')->once()->andReturn(false);
@@ -190,7 +199,8 @@ it('shows an error instead of a success message when the test email cannot be se
 });
 
 it('does not send a test email before an app password is saved', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     $delivery = Mockery::mock(MailDeliveryService::class);
     $delivery->shouldNotReceive('sendWithGmail');
     $this->instance(MailDeliveryService::class, $delivery);
@@ -204,8 +214,9 @@ it('does not send a test email before an app password is saved', function () {
 });
 
 it('keeps email settings isolated between owner accounts', function () {
-    $owner = User::factory()->create();
-    $otherOwner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
+    $otherOwner = Store::factory()->create()->owner;
     StoreEmailSetting::factory()->for($otherOwner)->create([
         'store_name' => 'Private Other Store',
         'sender_email' => 'other@gmail.com',
@@ -220,7 +231,8 @@ it('keeps email settings isolated between owner accounts', function () {
 });
 
 it('limits repeated test email requests for the same owner', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
     $delivery = Mockery::mock(MailDeliveryService::class);
     $delivery->shouldReceive('sendWithGmail')->times(3)->andReturn(true);
@@ -235,7 +247,8 @@ it('limits repeated test email requests for the same owner', function () {
 });
 
 it('asks the owner to re-enter an app password that can no longer be decrypted', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create();
     DB::table('store_email_settings')
         ->where('user_id', $owner->id)
@@ -268,7 +281,8 @@ it('asks the owner to re-enter an app password that can no longer be decrypted',
 });
 
 it('sends owner emails through the owner saved Gmail account and store name', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     StoreEmailSetting::factory()->for($owner)->create([
         'store_name' => 'Aling Nena Store',
         'sender_email' => 'nena@gmail.com',
@@ -300,7 +314,8 @@ it('sends owner emails through the owner saved Gmail account and store name', fu
 });
 
 it('does not send owner emails when the owner has not configured email settings', function () {
-    $owner = User::factory()->create();
+    $store = Store::factory()->create();
+    $owner = $store->owner;
     Mail::shouldReceive('build')->never();
     Mail::shouldReceive('to')->never();
 

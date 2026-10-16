@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Mail\ReusableEmail;
 use App\Models\EmailReminderLog;
 use App\Models\LedgerEntry;
-use App\Models\StoreEmailSetting;
-use App\Models\User;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,6 +23,16 @@ class PaymentReminderService
     private const RETRYABLE_SKIP_REASONS = [
         'customer_email_missing',
         'customer_email_invalid',
+    ];
+
+    /**
+     * Relations needed to send a reminder from the customer's own store owner.
+     *
+     * @var list<string>
+     */
+    private const SENDER_RELATIONS = [
+        'customer:id,store_id,full_name,email',
+        'customer.store.owner.storeEmailSetting',
     ];
 
     public function __construct(
@@ -49,24 +57,12 @@ class PaymentReminderService
             return $summary;
         }
 
-        $settings = StoreEmailSetting::query()->with('user')->get();
-        $owner = $settings->count() === 1 ? $settings->first()?->user : null;
-        $hasAmbiguousSettings = $settings->count() > 1;
-
-        if ($hasAmbiguousSettings) {
-            Log::warning('Repayment reminders were not sent because multiple store email settings exist.', [
-                'settings_count' => $settings->count(),
-            ]);
-        }
-
         foreach ($triggers as $trigger) {
             $summary['processed']++;
             $result = $this->processTrigger(
                 $trigger['ledger_entry'],
                 $trigger['reminder_type'],
                 $trigger['scheduled_date'],
-                $owner,
-                $hasAmbiguousSettings,
             );
             $summary[$result]++;
         }
@@ -85,7 +81,7 @@ class PaymentReminderService
     {
         $triggers = [];
         $candidateEntries = LedgerEntry::query()
-            ->with('customer:id,full_name,email')
+            ->with(self::SENDER_RELATIONS)
             ->withSum('payments as paid_amount', 'amount')
             ->whereNotNull('repayment_deadline')
             ->whereDate('repayment_deadline', '<=', $today->addDays(3)->toDateString())
@@ -122,7 +118,10 @@ class PaymentReminderService
     private function addRetryTriggers(array &$triggers, CarbonImmutable $today): void
     {
         $retryableLogs = EmailReminderLog::query()
-            ->with(['ledgerEntry.customer:id,full_name,email', 'ledgerEntry.payments'])
+            ->with([
+                ...array_map(fn (string $relation): string => 'ledgerEntry.'.$relation, self::SENDER_RELATIONS),
+                'ledgerEntry.payments',
+            ])
             ->whereDate('scheduled_reminder_date', '<=', $today->toDateString())
             ->where(function (Builder $query): void {
                 $query
@@ -190,8 +189,6 @@ class PaymentReminderService
         LedgerEntry $entry,
         string $reminderType,
         CarbonImmutable $scheduledDate,
-        ?User $owner,
-        bool $hasAmbiguousSettings,
     ): string {
         $identity = [
             'ledger_entry_id' => $entry->getKey(),
@@ -237,13 +234,16 @@ class PaymentReminderService
                 return 'skipped';
             }
 
-            if ($hasAmbiguousSettings) {
-                $this->markFailed($log, 'multiple_store_email_settings');
+            $store = $entry->customer->store;
+            $owner = $store?->owner;
+
+            if ($store === null || ! $store->isActive() || $owner === null || ! $owner->isActive()) {
+                $this->markFailed($log, 'store_unavailable');
 
                 return 'failed';
             }
 
-            if ($owner === null) {
+            if ($owner->storeEmailSetting?->appPassword() === null) {
                 $this->markFailed($log, 'sender_not_configured');
 
                 return 'failed';
