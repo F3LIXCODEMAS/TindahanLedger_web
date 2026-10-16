@@ -54,7 +54,11 @@ class CustomerController extends Controller
 
     public function store(SaveCustomerRequest $request): RedirectResponse
     {
-        Customer::query()->create($request->safe()->only([
+        $store = $request->user()->store;
+
+        abort_if($store === null, 403, 'Your account is not assigned to a store.');
+
+        $store->customers()->create($request->safe()->only([
             'full_name',
             'contact_number',
             'email',

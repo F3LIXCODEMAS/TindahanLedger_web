@@ -5,6 +5,7 @@ use App\Exceptions\PaymentExceedsBalance;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Models\Store;
 use App\Models\SukiPoint;
 use App\Models\User;
 use App\Services\LedgerService;
@@ -255,15 +256,34 @@ it('does not duplicate demo customers or transactions when seeded repeatedly', f
     config(['app.demo_owner_password' => 'only-for-this-test-password']);
 
     $this->seed();
-    $this->assertDatabaseCount('users', 1);
-    $this->assertDatabaseCount('customers', 5);
-    $this->assertDatabaseCount('ledger_entries', 8);
-    $this->assertDatabaseCount('payments', 5);
+    $this->assertDatabaseCount('users', 2);
+    $this->assertDatabaseCount('stores', 2);
+    $this->assertDatabaseCount('customers', 7);
+    $this->assertDatabaseCount('ledger_entries', 10);
+    $this->assertDatabaseCount('payments', 7);
 
     $this->seed();
 
-    $this->assertDatabaseCount('users', 1);
-    $this->assertDatabaseCount('customers', 5);
-    $this->assertDatabaseCount('ledger_entries', 8);
-    $this->assertDatabaseCount('payments', 5);
+    $this->assertDatabaseCount('users', 2);
+    $this->assertDatabaseCount('stores', 2);
+    $this->assertDatabaseCount('customers', 7);
+    $this->assertDatabaseCount('ledger_entries', 10);
+    $this->assertDatabaseCount('payments', 7);
+});
+
+it('seeds each demo store owner with the store name as their username', function () {
+    config(['app.demo_owner_password' => 'only-for-this-test-password']);
+
+    $this->seed();
+
+    $storeNamesByUsername = Store::query()
+        ->with('owner')
+        ->get()
+        ->mapWithKeys(fn (Store $store): array => [$store->owner->username => $store->store_name]);
+
+    expect($storeNamesByUsername->all())->toBe([
+        'mang arthur store' => 'Mang Arthur Store',
+        'aling nena store' => 'Aling Nena Store',
+    ]);
+    expect(User::query()->where('role', User::ROLE_SUPER_ADMIN)->exists())->toBeFalse();
 });

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Customer;
+use App\Models\Store;
 use App\Models\User;
 use App\Services\LedgerService;
 use Illuminate\Support\Facades\Mail;
@@ -22,7 +23,7 @@ it('lets the owner open the customer list and add form', function () {
 
 it('creates a customer with normalized name phone and email without sending mail', function () {
     Mail::fake();
-    $owner = User::factory()->create();
+    $owner = User::factory()->withStore()->create();
 
     $response = $this->actingAs($owner)->post(route('customers.store'), [
         'full_name' => '  Maria   Santos  ',
@@ -40,7 +41,36 @@ it('creates a customer with normalized name phone and email without sending mail
     expect($customer->contact_number)->toBe('+639171234567');
     expect($customer->residential_landmark)->toBe('Near the public market');
     expect($customer->credit_limit)->toBe('500.00');
+    expect($customer->store_id)->toBe($owner->store->id);
     Mail::assertNothingOutgoing();
+});
+
+it('ignores a submitted store id and assigns the customer to the owner store', function () {
+    $owner = User::factory()->withStore()->create();
+    $otherStore = Store::factory()->create();
+
+    $this->actingAs($owner)->post(route('customers.store'), [
+        'store_id' => $otherStore->id,
+        'full_name' => 'Maria Santos',
+        'contact_number' => '09171234567',
+        'residential_landmark' => 'Near the public market',
+        'credit_limit' => '500.00',
+    ])->assertRedirect(route('customers.index'));
+
+    expect(Customer::query()->sole()->store_id)->toBe($owner->store->id);
+});
+
+it('forbids creating a customer when the owner has no store', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)->post(route('customers.store'), [
+        'full_name' => 'Maria Santos',
+        'contact_number' => '09171234567',
+        'residential_landmark' => 'Near the public market',
+        'credit_limit' => '500.00',
+    ])->assertForbidden();
+
+    expect(Customer::query()->count())->toBe(0);
 });
 
 it('rejects missing fields invalid phone email and credit limit', function () {
@@ -62,7 +92,7 @@ it('rejects missing fields invalid phone email and credit limit', function () {
 });
 
 it('creates and updates a customer without requiring an email address', function () {
-    $owner = User::factory()->create();
+    $owner = User::factory()->withStore()->create();
     $customerData = [
         'full_name' => 'Walk-in Customer',
         'contact_number' => '09171234567',
