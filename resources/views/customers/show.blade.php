@@ -89,6 +89,7 @@
                 @else
                     <a class="ledger-action-button is-payment-action" href="{{ route('payments.create', ['customer_id' => $customer->id]) }}">Record Payment</a>
                 @endif
+                <a class="ledger-action-button" href="{{ route('customers.access-code.show', $customer) }}">Customer QR access</a>
             </div>
         </section>
 

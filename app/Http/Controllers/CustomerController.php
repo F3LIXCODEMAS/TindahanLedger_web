@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SaveCustomerRequest;
 use App\Models\Customer;
 use App\Models\EmailReminderLog;
+use App\Services\CustomerAccessService;
 use App\Services\CustomerLedgerService;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
@@ -62,15 +64,23 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function store(SaveCustomerRequest $request): RedirectResponse
+    /**
+     * The customer and their QR access credential are created together, so a
+     * failure leaves neither behind.
+     */
+    public function store(SaveCustomerRequest $request, CustomerAccessService $customerAccess): RedirectResponse
     {
-        $request->user()->store->customers()->create($request->safe()->only([
-            'full_name',
-            'contact_number',
-            'email',
-            'residential_landmark',
-            'credit_limit',
-        ]));
+        DB::transaction(function () use ($request, $customerAccess): void {
+            $customer = $request->user()->store->customers()->create($request->safe()->only([
+                'full_name',
+                'contact_number',
+                'email',
+                'residential_landmark',
+                'credit_limit',
+            ]));
+
+            $customerAccess->issue($customer, $request->user());
+        });
 
         return redirect()->route('customers.index')->with('status', 'Customer added successfully.');
     }

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Database\Factories\CustomerFactory;
+use Illuminate\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,10 +12,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class Customer extends Model
+/**
+ * Customers can sign in to the read-only self-service portal through the
+ * `customer` guard using a QR access credential. They have no password and
+ * no user account, and the guard never grants owner or admin access.
+ */
+class Customer extends Model implements AuthenticatableContract
 {
     /** @use HasFactory<CustomerFactory> */
-    use HasFactory;
+    use Authenticatable, HasFactory;
 
     protected function email(): Attribute
     {
@@ -57,6 +64,17 @@ class Customer extends Model
     public function emailReminderLogs(): HasMany
     {
         return $this->hasMany(EmailReminderLog::class);
+    }
+
+    public function accessCredentials(): HasMany
+    {
+        return $this->hasMany(CustomerAccessCredential::class);
+    }
+
+    public function activeAccessCredential(): HasOne
+    {
+        return $this->hasOne(CustomerAccessCredential::class)
+            ->where('status', CustomerAccessCredential::STATUS_ACTIVE);
     }
 
     public function sukiPoints(): HasOne

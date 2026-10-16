@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsureCustomerPortalSession;
 use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\EnsureStoreIsActive;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\SetPrivatePageHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
             'password.changed' => EnsurePasswordIsChanged::class,
             'store.active' => EnsureStoreIsActive::class,
+            'private.headers' => SetPrivatePageHeaders::class,
+            'customer.portal' => EnsureCustomerPortalSession::class,
         ]);
 
         $middleware->redirectUsersTo(fn (Request $request): string => $request->user()?->isSuperAdmin()
@@ -31,5 +35,5 @@ return Application::configure(basePath: dirname(__DIR__))
             : route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash('app_password');
+        $exceptions->dontFlash(['app_password', 'token', 'temporary_password', 'temporary_password_confirmation']);
     })->create();

@@ -305,3 +305,35 @@ document.addEventListener('submit', (event) => {
 		event.preventDefault();
 	}
 });
+
+const portalAccessForm = document.querySelector('[data-portal-access-form]');
+
+if (portalAccessForm instanceof HTMLFormElement) {
+	const accessToken = window.location.hash.slice(1);
+
+	if (window.location.hash !== '') {
+		window.history.replaceState(null, '', window.location.pathname + window.location.search);
+	}
+
+	const tokenInput = portalAccessForm.querySelector('input[name="token"]');
+	const loadingMessage = portalAccessForm.querySelector('[data-portal-loading]');
+	const instructions = document.querySelector('[data-portal-instructions]');
+
+	if (accessToken !== '' && tokenInput instanceof HTMLInputElement) {
+		tokenInput.value = accessToken;
+
+		if (loadingMessage instanceof HTMLElement) {
+			loadingMessage.hidden = false;
+		}
+
+		if (instructions instanceof HTMLElement) {
+			instructions.hidden = true;
+		}
+
+		portalAccessForm.submit();
+	}
+}
+
+document.querySelectorAll('[data-print-page]').forEach((printButton) => {
+	printButton.addEventListener('click', () => window.print());
+});

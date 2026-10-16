@@ -13,15 +13,33 @@ use App\Http\Controllers\Admin\UserStatusController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\CreditController;
+use App\Http\Controllers\CustomerAccessCodeController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OverdueAccountController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\Portal\CustomerPortalController;
+use App\Http\Controllers\Portal\PortalAccessController;
 use App\Http\Controllers\StoreEmailSettingsController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
+
+/*
+ * Customer self-service portal: QR-only, read-only, and separate from owner
+ * and Super Admin routes. It uses the `customer` guard, never `web`.
+ */
+Route::prefix('portal')->name('portal.')->middleware('private.headers')->group(function () {
+    Route::get('/', [PortalAccessController::class, 'entry'])->name('entry');
+    Route::post('/access', [PortalAccessController::class, 'store'])
+        ->middleware('throttle:customer-portal-access')
+        ->name('access');
+    Route::post('/exit', [PortalAccessController::class, 'destroy'])->name('exit');
+    Route::get('/ledger', [CustomerPortalController::class, 'show'])
+        ->middleware('customer.portal')
+        ->name('dashboard');
+});
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -92,6 +110,20 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::match(['put', 'patch'], '/customers/{customer}', [CustomerController::class, 'update'])
             ->name('customers.update');
+    });
+
+    Route::middleware('private.headers')->group(function () {
+        Route::get('/customers/{customer}/access-code', [CustomerAccessCodeController::class, 'show'])
+            ->name('customers.access-code.show');
+        Route::get('/customers/{customer}/access-code/download', [CustomerAccessCodeController::class, 'download'])
+            ->name('customers.access-code.download');
+        Route::get('/customers/{customer}/access-code/card', [CustomerAccessCodeController::class, 'card'])
+            ->name('customers.access-code.card');
+        Route::post('/customers/{customer}/access-code', [CustomerAccessCodeController::class, 'store'])
+            ->middleware('store.active')
+            ->name('customers.access-code.store');
+        Route::delete('/customers/{customer}/access-code', [CustomerAccessCodeController::class, 'destroy'])
+            ->name('customers.access-code.destroy');
     });
 
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])
