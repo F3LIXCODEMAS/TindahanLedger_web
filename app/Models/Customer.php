@@ -86,4 +86,9 @@ class Customer extends Model implements AuthenticatableContract
     {
         return $this->hasMany(SukiPointTransaction::class);
     }
+
+    public function debtCycleCompletions(): HasMany
+    {
+        return $this->hasMany(DebtCycleCompletion::class);
+    }
 }

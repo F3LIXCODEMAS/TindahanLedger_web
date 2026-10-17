@@ -6,6 +6,7 @@ use App\Exceptions\CreditLimitExceeded;
 use App\Exceptions\PaymentExceedsBalance;
 use App\Exceptions\StoreSuspended;
 use App\Models\Customer;
+use App\Models\DebtCycleCompletion;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Models\Store;
@@ -106,7 +107,7 @@ class LedgerService
             $lockedCustomer->update(['current_balance' => Money::fromCents($newCustomerBalanceInCents)]);
 
             if ($previousBalanceInCents > 0 && $newCustomerBalanceInCents === 0) {
-                $this->completeDebtCycle($lockedCustomer);
+                $this->completeDebtCycle($lockedCustomer, $payment);
             }
 
             return $payment;
@@ -228,7 +229,7 @@ class LedgerService
             $debtCycleCompleted = $previousBalanceInCents > 0 && $newCustomerBalanceInCents === 0;
 
             if ($debtCycleCompleted) {
-                $this->completeDebtCycle($lockedCustomer);
+                $this->completeDebtCycle($lockedCustomer, $payments->last());
             }
 
             return [
@@ -305,19 +306,51 @@ class LedgerService
         }
     }
 
-    private function completeDebtCycle(Customer $customer): void
+    /**
+     * Record a completed debt cycle and, on the last cycle of a streak, give
+     * the three-cycle reward: one point per configured peso amount of cash
+     * repaid during the streak. Runs inside the payment transaction with the
+     * customer row locked; the unique completing payment and cycle number
+     * make a second completion or reward for the same cycle impossible.
+     */
+    private function completeDebtCycle(Customer $customer, Payment $completingPayment): DebtCycleCompletion
     {
         $sukiPoints = $customer->sukiPoints()->firstOrCreate([
             'customer_id' => $customer->id,
         ]);
-        $currentCycleCount = $sukiPoints->current_cycle_count + 1;
-        $rewardEligible = $currentCycleCount >= $sukiPoints->reward_threshold;
+        $streakPosition = $sukiPoints->current_cycle_count + 1;
+        $completesStreak = $streakPosition >= $sukiPoints->reward_threshold;
+        $rewardPoints = $completesStreak
+            ? intdiv($sukiPoints->streak_repaid_cents, $this->cycleRewardCentsPerPoint())
+            : 0;
+
+        $completion = new DebtCycleCompletion;
+        $completion->forceFill([
+            'customer_id' => $customer->id,
+            'completing_payment_id' => $completingPayment->id,
+            'cycle_number' => $sukiPoints->completed_cycles + 1,
+            'streak_position' => $streakPosition,
+            'repaid_cents' => $sukiPoints->cycle_repaid_cents,
+            'reward_points' => $rewardPoints,
+            'source' => DebtCycleCompletion::SOURCE_PAYMENT,
+            'completed_at' => now(),
+        ])->save();
 
         $sukiPoints->update([
             'completed_cycles' => $sukiPoints->completed_cycles + 1,
-            'current_cycle_count' => $rewardEligible ? 0 : $currentCycleCount,
-            'reward_eligible' => $rewardEligible,
+            'current_cycle_count' => $completesStreak ? 0 : $streakPosition,
+            'points_balance' => $sukiPoints->points_balance + $rewardPoints,
+            'cycle_repaid_cents' => 0,
+            'streak_repaid_cents' => $completesStreak ? 0 : $sukiPoints->streak_repaid_cents,
+            'reward_eligible' => false,
         ]);
+
+        return $completion;
+    }
+
+    private function cycleRewardCentsPerPoint(): int
+    {
+        return max(1, (int) config('suki_points.cycle_reward_pesos_per_point')) * 100;
     }
 
     private function awardRepaymentPoints(Customer $customer, Payment $payment, int $paymentAmountInCents): void
@@ -341,6 +374,8 @@ class LedgerService
         $sukiPoints->update([
             'points_balance' => $sukiPoints->points_balance + $pointsAwarded,
             'repayment_remainder_cents' => $remainderAfterCents,
+            'cycle_repaid_cents' => $sukiPoints->cycle_repaid_cents + $paymentAmountInCents,
+            'streak_repaid_cents' => $sukiPoints->streak_repaid_cents + $paymentAmountInCents,
         ]);
     }
 }
