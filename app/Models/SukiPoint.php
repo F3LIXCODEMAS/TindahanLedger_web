@@ -10,7 +10,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SukiPoint extends Model
 {
+    /**
+     * Earning rule: one point for every ₱100.00 actually repaid.
+     */
     public const CENTS_PER_POINT = 10000;
+
+    /**
+     * Redemption rule: each point is worth ₱1.00 of credit against debt.
+     */
+    public const REDEMPTION_CENTS_PER_POINT = 100;
 
     /** @use HasFactory<SukiPointFactory> */
     use HasFactory;
