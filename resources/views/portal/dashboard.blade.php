@@ -17,25 +17,42 @@
     </header>
 
     <section class="portal-card portal-balance" aria-labelledby="portal-balance-title">
-        <h2 id="portal-balance-title">Current balance</h2>
-        <p class="portal-balance-value">₱{{ $ledger['outstanding_balance'] }}</p>
-        @if ($ledger['penalty_outstanding'] !== '0.00')
-            <p class="portal-muted">Includes late payment fees of ₱{{ $ledger['penalty_outstanding'] }} (credits ₱{{ $ledger['principal_outstanding'] }}).</p>
-        @endif
+        @php($financials = $ledger['financials'])
+        <h2 id="portal-balance-title">Total amount due</h2>
+        <p class="portal-balance-value">₱{{ $financials['total_due'] }}</p>
 
-        @if ($ledger['outstanding_balance'] === '0.00')
+        @if ($financials['total_due'] === '0.00')
             <p class="portal-status is-good">Fully paid. You have no outstanding balance.</p>
         @elseif ($ledger['is_overdue'])
             <p class="portal-status is-warning">Overdue: {{ $ledger['overdue_entry_count'] }} {{ $ledger['overdue_entry_count'] === 1 ? 'credit is' : 'credits are' }} past the repayment deadline.</p>
+        @elseif ($financials['penalties_outstanding'] !== '0.00')
+            <p class="portal-status is-warning">Your credits are paid. A late fee of ₱{{ $financials['penalties_outstanding'] }} is still unpaid.</p>
         @else
             <p class="portal-status">Not overdue</p>
         @endif
 
         <dl class="portal-summary">
+            <div><dt>Unpaid credit (principal)</dt><dd>₱{{ $financials['principal_outstanding'] }}</dd></div>
+            <div><dt>Unpaid late fees</dt><dd>₱{{ $financials['penalties_outstanding'] }}</dd></div>
+            <div><dt>Cash payments recorded</dt><dd>₱{{ $financials['cash_received'] }}</dd></div>
+            @if ($financials['points_redeemed_amount'] !== '0.00')
+                <div><dt>Suki Points used</dt><dd>₱{{ $financials['points_redeemed_amount'] }}</dd></div>
+            @endif
+            @if ($financials['penalties_waived'] !== '0.00')
+                <div><dt>Late fees waived</dt><dd>₱{{ $financials['penalties_waived'] }}</dd></div>
+            @endif
             <div><dt>Credit limit</dt><dd>₱{{ $customer->credit_limit }}</dd></div>
             <div><dt>Available credit</dt><dd>₱{{ $ledger['available_credit'] }}</dd></div>
         </dl>
     </section>
+
+    @if ($hasLateFeeTerms)
+        <section class="portal-card" aria-labelledby="portal-late-fee-title">
+            <h2 id="portal-late-fee-title">How late fees work</h2>
+            <p class="portal-muted">Some of your credits were accepted under {{ $customer->store->store_name }}'s late payment policy. If one of them is not fully paid by its repayment deadline plus its grace days, a one-time late fee is added as a separate entry. The fee and grace days are the ones agreed when the credit was recorded and are shown with each credit below.</p>
+            <p class="portal-muted">A late fee is a charge, not a payment, and it never changes the original credit. Your payments are applied to your oldest unpaid entry first. The store may waive a late fee; a waiver is not a cash payment.</p>
+        </section>
+    @endif
 
     @if ($outstandingDeadlines->isNotEmpty())
         <section class="portal-card" aria-labelledby="portal-deadlines-title">
@@ -48,6 +65,7 @@
                             @if ($credit['is_overdue'])
                                 <strong class="portal-status is-warning">Overdue</strong>
                             @endif
+                            @include('portal.partials.fee-status', ['status' => $credit['penalty_status']])
                         </span>
                         <span class="portal-amount">₱{{ $credit['remaining_amount'] }} left</span>
                     </li>
@@ -89,6 +107,17 @@
                                     @endif
                                     @if ($transaction['is_overdue'])
                                         · <strong class="portal-status is-warning">Overdue</strong>
+                                    @endif
+                                </span>
+                                @include('portal.partials.fee-status', ['status' => $transaction['penalty_status']])
+                            @elseif ($transaction['type'] === 'late_penalty')
+                                <span class="portal-muted">
+                                    @if ($transaction['penalty_waived_at'])
+                                        Waived by the store on {{ $transaction['penalty_waived_at']->format('M j, Y') }}
+                                    @elseif ($transaction['remaining_amount'] === '0.00')
+                                        Paid
+                                    @else
+                                        Unpaid · ₱{{ $transaction['remaining_amount'] }} left
                                     @endif
                                 </span>
                             @endif

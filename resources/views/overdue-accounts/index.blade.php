@@ -17,6 +17,7 @@
             <a class="owner-nav-link" href="{{ route('dashboard') }}">Dashboard</a>
             <a class="owner-nav-link is-current" href="{{ route('overdue-accounts.index') }}" aria-current="page">Overdue accounts</a>
             <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
+            <a class="owner-nav-link" href="{{ route('late-penalties.edit') }}">Late payment policy</a>
             <a class="owner-nav-link" href="{{ route('password.edit') }}">Change password</a>
             <span class="owner-name">{{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">
@@ -49,7 +50,7 @@
                 <label for="overdue-sort">Sort by</label>
                 <select id="overdue-sort" name="sort">
                     <option value="longest" @selected($sort === 'longest')>Longest overdue first</option>
-                    <option value="balance" @selected($sort === 'balance')>Highest outstanding balance</option>
+                    <option value="balance" @selected($sort === 'balance')>Highest total amount due</option>
                 </select>
             </div>
             <button class="overdue-filter-button" type="submit">Apply</button>
@@ -60,6 +61,15 @@
                 <h2 id="overdue-results-title">Overdue customers</h2>
                 <span>{{ $customers->total() }} {{ $customers->total() === 1 ? 'customer' : 'customers' }}</span>
             </div>
+
+            @if ($customers->total() > 0)
+                <dl class="overdue-totals" aria-label="Totals for overdue accounts">
+                    <div><dt>Overdue principal</dt><dd>₱{{ $overdueTotals['overdue_principal'] }}</dd></div>
+                    <div><dt>Outstanding principal</dt><dd>₱{{ $overdueTotals['principal_outstanding'] }}</dd></div>
+                    <div><dt>Outstanding late fees</dt><dd>₱{{ $overdueTotals['penalties_outstanding'] }}</dd></div>
+                    <div><dt>Total amount due</dt><dd>₱{{ $overdueTotals['total_due'] }}</dd></div>
+                </dl>
+            @endif
 
             @if ($customers->isEmpty())
                 <div class="activity-empty overdue-empty" role="status">
@@ -80,8 +90,16 @@
 
                             <dl class="overdue-account-summary">
                                 <div>
-                                    <dt>Current outstanding balance</dt>
-                                    <dd>₱{{ $customer->outstanding_balance }}</dd>
+                                    <dt>Total amount due</dt>
+                                    <dd>₱{{ $customer->financials['total_due'] }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Overdue principal</dt>
+                                    <dd>₱{{ $customer->financials['overdue_principal'] }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Outstanding late fees</dt>
+                                    <dd>₱{{ $customer->financials['penalties_outstanding'] }}</dd>
                                 </div>
                                 <div>
                                     <dt>Longest overdue</dt>
@@ -104,7 +122,7 @@
                                                     <p>{{ $entry->note }}</p>
                                                 @endif
                                             </div>
-                                            <span class="overdue-entry-balance">₱{{ $entry->outstanding_balance }} unpaid</span>
+                                            <span class="overdue-entry-balance">₱{{ $entry->unpaid_amount }} unpaid</span>
                                         </div>
                                         <dl class="overdue-entry-details">
                                             <div>
@@ -183,6 +201,65 @@
                 {{ $customers->links() }}
             @endif
         </section>
+
+        @if ($feeOnlyCustomers->isNotEmpty())
+            <section class="overdue-results overdue-fee-only" aria-labelledby="fee-only-title">
+                <div class="overdue-results-heading">
+                    <h2 id="fee-only-title">Unpaid late fees</h2>
+                    <span>{{ $feeOnlyCustomers->total() }} {{ $feeOnlyCustomers->total() === 1 ? 'customer' : 'customers' }}</span>
+                </div>
+                <p class="metric-note">These customers have no overdue credit, but a late fee is still unpaid. They are not counted as overdue accounts.</p>
+
+                <div class="overdue-account-list">
+                    @foreach ($feeOnlyCustomers as $customer)
+                        <article class="overdue-account-card">
+                            <header class="overdue-account-heading">
+                                <div class="overdue-customer-identity">
+                                    <h3>{{ $customer->full_name }}</h3>
+                                    <p>{{ $customer->contact_number ?: 'No contact number on file' }}</p>
+                                </div>
+                                <a class="overdue-ledger-link" href="{{ route('customers.show', $customer) }}">View Ledger</a>
+                            </header>
+
+                            <dl class="overdue-account-summary">
+                                <div>
+                                    <dt>Total amount due</dt>
+                                    <dd>₱{{ $customer->financials['total_due'] }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Outstanding principal</dt>
+                                    <dd>₱{{ $customer->financials['principal_outstanding'] }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Outstanding late fees</dt>
+                                    <dd>₱{{ $customer->financials['penalties_outstanding'] }}</dd>
+                                </div>
+                            </dl>
+
+                            <div class="overdue-entry-list">
+                                @foreach ($customer->ledgerEntries as $penalty)
+                                    <section class="overdue-credit-entry" aria-label="Unpaid late fee">
+                                        <div class="overdue-entry-heading">
+                                            <div>
+                                                <h4>Late payment fee · ₱{{ $penalty->amount }}</h4>
+                                                <p>Added {{ $penalty->transaction_date->format('M j, Y') }}
+                                                    @if ($penalty->penaltyFor)
+                                                        on the ₱{{ $penalty->penaltyFor->amount }} credit due {{ $penalty->penaltyFor->repayment_deadline?->format('M j, Y') }}
+                                                    @endif
+                                                </p>
+                                            </div>
+                                            <span class="overdue-entry-balance">₱{{ $penalty->unpaid_amount }} unpaid</span>
+                                        </div>
+                                    </section>
+                                @endforeach
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+
+                {{ $feeOnlyCustomers->links() }}
+            </section>
+        @endif
     </main>
 </body>
 </html>

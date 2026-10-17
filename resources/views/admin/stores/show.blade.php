@@ -25,7 +25,7 @@
             <div><dt>Owner email</dt><dd>{{ $store->owner->email }}</dd></div>
             <div><dt>Owner account</dt><dd>{{ $store->owner->isActive() ? 'Active' : 'Deactivated' }}</dd></div>
             <div><dt>Customers</dt><dd>{{ number_format($store->customer_count) }}</dd></div>
-            <div><dt>Current outstanding debt</dt><dd>₱{{ $store->outstanding_balance }}</dd></div>
+            <div><dt>Current outstanding debt (principal + late fees)</dt><dd>₱{{ $store->outstanding_balance }}</dd></div>
             <div><dt>Current overdue balance</dt><dd>₱{{ $store->overdue_balance }}</dd></div>
         </dl>
     </section>

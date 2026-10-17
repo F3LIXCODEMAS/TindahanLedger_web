@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Services\CustomerLedgerService;
+use App\Services\LatePenaltyService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +36,10 @@ class CustomerPortalController extends Controller
             'customer' => $customer,
             'ledger' => $ledger,
             'transactions' => $transactions,
+            'hasLateFeeTerms' => $ledger['transactions']->contains(
+                fn (array $transaction): bool => $transaction['type'] === 'late_penalty'
+                    || ($transaction['penalty_status']['state'] ?? LatePenaltyService::STATE_NOT_COVERED) !== LatePenaltyService::STATE_NOT_COVERED,
+            ),
             'outstandingDeadlines' => $ledger['transactions']
                 ->filter(fn (array $transaction): bool => $transaction['type'] === 'credit'
                     && $transaction['deadline'] !== null

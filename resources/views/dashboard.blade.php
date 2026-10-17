@@ -44,14 +44,35 @@
             </p>
         @endif
 
-        <section class="dashboard-metrics" aria-label="Store summary">
-            <article class="metric-panel metric-collectibles" aria-labelledby="collectibles-title">
+        <section class="dashboard-metrics has-financials" aria-label="Store summary">
+            <article class="metric-panel metric-collectibles" aria-labelledby="principal-title">
                 <div class="metric-label-row">
-                    <h2 id="collectibles-title">Total collectibles</h2>
+                    <h2 id="principal-title">Outstanding principal</h2>
                     <span class="metric-symbol" aria-hidden="true">₱</span>
                 </div>
-                <p class="metric-value">₱{{ $totalCollectibles }}</p>
-                <p class="metric-note">Outstanding customer balances</p>
+                <p class="metric-value">₱{{ $outstandingPrincipal }}</p>
+                <p class="metric-note">Unpaid credit, excluding late fees</p>
+            </article>
+
+            <article class="metric-panel metric-penalties" aria-labelledby="penalties-title">
+                <div class="metric-label-row">
+                    <h2 id="penalties-title">Outstanding late fees</h2>
+                    <span class="metric-symbol" aria-hidden="true">₱</span>
+                </div>
+                <p class="metric-value">₱{{ $outstandingPenalties }}</p>
+                <p class="metric-note">{{ $customersWithOutstandingPenalties }} {{ $customersWithOutstandingPenalties === 1 ? 'customer has' : 'customers have' }} an unpaid late fee</p>
+                @if ($recentPenaltyCount > 0)
+                    <p class="metric-note" role="status">{{ $recentPenaltyCount }} late payment {{ $recentPenaltyCount === 1 ? 'fee was' : 'fees were' }} added in the last 7 days.</p>
+                @endif
+            </article>
+
+            <article class="metric-panel metric-collectibles" aria-labelledby="total-due-title">
+                <div class="metric-label-row">
+                    <h2 id="total-due-title">Total amount due</h2>
+                    <span class="metric-symbol" aria-hidden="true">₱</span>
+                </div>
+                <p class="metric-value">₱{{ $totalAmountDue }}</p>
+                <p class="metric-note">Outstanding principal plus outstanding late fees</p>
             </article>
 
             <article class="metric-panel metric-overdue" aria-labelledby="overdue-title">
@@ -61,9 +82,11 @@
                 </div>
                 <p class="metric-value">{{ $overdueAccountCount }}</p>
                 <a class="metric-note overdue-metric-link" href="{{ route('overdue-accounts.index') }}">Review overdue customers</a>
-                @if ($recentPenaltyCount > 0)
-                    <p class="metric-note" role="status">{{ $recentPenaltyCount }} late payment {{ $recentPenaltyCount === 1 ? 'fee was' : 'fees were' }} added in the last 7 days.</p>
-                @endif
+                <ul class="metric-note metric-penalty-counts" aria-label="Overdue credits by late fee status">
+                    <li>{{ $overdueCreditPenaltyStates['in_grace'] }} overdue {{ $overdueCreditPenaltyStates['in_grace'] === 1 ? 'credit' : 'credits' }} still in the grace period</li>
+                    <li>{{ $overdueCreditPenaltyStates['eligible'] }} eligible for a late fee at the next daily run</li>
+                    <li>{{ $overdueCreditPenaltyStates['applied'] }} with a late fee already added</li>
+                </ul>
             </article>
         </section>
 

@@ -17,8 +17,12 @@ class OverdueAccountController extends Controller
         $search = trim((string) ($filters['search'] ?? ''));
         $sort = $filters['sort'] ?? 'longest';
 
+        $store = $request->user()->store;
+
         return view('overdue-accounts.index', [
-            'customers' => $overdueAccountService->paginate($request->user()->store, $search, $sort),
+            'customers' => $overdueAccountService->paginate($store, $search, $sort),
+            'overdueTotals' => $overdueAccountService->totals($store, $search),
+            'feeOnlyCustomers' => $overdueAccountService->customersWithOnlyUnpaidFees($store, $search),
             'search' => $search,
             'sort' => $sort,
         ]);

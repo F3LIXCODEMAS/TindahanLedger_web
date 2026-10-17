@@ -39,7 +39,7 @@ it('calculates collectibles and overdue customers from ledger and payment record
     $response = $this->actingAs($owner)->get('/dashboard');
 
     $response->assertOk()
-        ->assertViewHas('totalCollectibles', '800.00')
+        ->assertViewHas('outstandingPrincipal', '800.00')
         ->assertViewHas('overdueAccountCount', 1)
         ->assertViewHas('recentActivity', function ($activities) use ($paidCustomer): bool {
             return $activities->count() === 7
@@ -54,7 +54,7 @@ it('shows zero collectibles, no overdue accounts, and an empty activity state', 
 
     $this->actingAs($owner)->get('/dashboard')
         ->assertOk()
-        ->assertViewHas('totalCollectibles', '0.00')
+        ->assertViewHas('outstandingPrincipal', '0.00')
         ->assertViewHas('overdueAccountCount', 0)
         ->assertViewHas('recentActivity', fn ($activities): bool => $activities->isEmpty())
         ->assertSee('No recent activity yet.');

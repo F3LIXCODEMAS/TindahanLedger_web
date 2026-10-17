@@ -289,7 +289,7 @@ describe('ledger and waivers', function () {
             ->get(route('customers.show', $customer))
             ->assertOk()
             ->assertSeeText('Late payment fee')
-            ->assertSeeText('Principal ₱500.00 + late fees ₱10.00')
+            ->assertSeeTextInOrder(['TOTAL AMOUNT DUE', '₱510.00', 'OUTSTANDING PRINCIPAL', '₱500.00', 'OUTSTANDING LATE FEES', '₱10.00'])
             ->assertSeeText('Waive fee');
     });
 

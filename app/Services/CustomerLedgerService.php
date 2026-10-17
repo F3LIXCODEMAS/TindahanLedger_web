@@ -21,11 +21,18 @@ class CustomerLedgerService
     public function __construct(
         private LedgerService $ledgerService,
         private LatePenaltyService $latePenaltyService,
+        private FinancialSummaryService $financialSummaryService,
     ) {}
 
     /**
+     * Totals come from FinancialSummaryService, the shared definition used by
+     * the dashboard and overdue page too.
+     *
      * @return array{
      *     outstanding_balance: string,
+     *     principal_outstanding: string,
+     *     penalty_outstanding: string,
+     *     financials: array<string, mixed>,
      *     available_credit: string,
      *     is_overdue: bool,
      *     overdue_entry_count: int,
@@ -58,46 +65,26 @@ class CustomerLedgerService
             ->orderBy('id')
             ->get();
 
-        $paymentsByEntry = $payments->groupBy('ledger_entry_id');
-        $paidAmountsByEntry = [];
-
-        foreach ($paymentsByEntry as $ledgerEntryId => $entryPayments) {
-            $paidAmountsByEntry[$ledgerEntryId] = $entryPayments->sum(
-                fn (Payment $payment): int => Money::toCents($payment->amount),
-            );
-        }
-
         $financialSummary = $this->ledgerService->financialSummary($customer);
-        $overdueEntryCount = 0;
-        $principalOutstandingInCents = 0;
-        $penaltyOutstandingInCents = 0;
+        $customerSummary = $this->financialSummaryService->forCustomer($customer);
+        $financials = $customerSummary['totals'];
+        $today = $this->financialSummaryService->today();
         $events = [];
         $penaltiesByCredit = $credits->filter(fn (LedgerEntry $entry): bool => $entry->isLatePenalty())->keyBy('penalty_for_entry_id');
 
         foreach ($credits as $entry) {
-            $remainingAmountInCents = max(
-                0,
-                Money::toCents($entry->amount) - ($paidAmountsByEntry[$entry->id] ?? 0),
-            );
+            $remainingAmountInCents = $customerSummary['entry_remaining_cents'][$entry->id] ?? 0;
             $isPenalty = $entry->isLatePenalty();
-            $isOverdue = $remainingAmountInCents > 0
+            $isOverdue = ! $isPenalty
+                && $remainingAmountInCents > 0
                 && $entry->repayment_deadline !== null
-                && $entry->repayment_deadline->lt(today());
-
-            if ($isOverdue) {
-                $overdueEntryCount++;
-            }
-
-            if ($isPenalty) {
-                $penaltyOutstandingInCents += $remainingAmountInCents;
-            } else {
-                $principalOutstandingInCents += $remainingAmountInCents;
-            }
+                && $entry->repayment_deadline->toDateString() < $today->toDateString();
 
             $penaltyStatus = $isPenalty ? null : $this->latePenaltyService->statusFor(
                 $entry,
                 $remainingAmountInCents,
                 $penaltiesByCredit->get($entry->id),
+                $today,
             );
 
             $events[] = [
@@ -233,11 +220,12 @@ class CustomerLedgerService
 
         return [
             'outstanding_balance' => $financialSummary['outstanding_balance'],
-            'principal_outstanding' => Money::fromCents($principalOutstandingInCents),
-            'penalty_outstanding' => Money::fromCents($penaltyOutstandingInCents),
+            'principal_outstanding' => $financials['principal_outstanding'],
+            'penalty_outstanding' => $financials['penalties_outstanding'],
+            'financials' => $financials,
             'available_credit' => $financialSummary['available_credit'],
-            'is_overdue' => $overdueEntryCount > 0,
-            'overdue_entry_count' => $overdueEntryCount,
+            'is_overdue' => $financials['overdue_entry_count'] > 0,
+            'overdue_entry_count' => $financials['overdue_entry_count'],
             'transactions' => $transactions,
             'rewards' => [
                 'points_balance' => $pointsBalance,

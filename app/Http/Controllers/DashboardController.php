@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Services\FinancialSummaryService;
 use App\Support\Money;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,33 +13,16 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): View
+    /**
+     * "Outstanding principal" keeps the original meaning of the former Total
+     * collectibles KPI (unpaid credit only); late fees and the total amount
+     * due are shown as separate figures from FinancialSummaryService.
+     */
+    public function __invoke(Request $request, FinancialSummaryService $financialSummaryService): View
     {
-        $storeId = $request->user()->store->getKey();
-
-        $paymentsByEntry = DB::table('payments')
-            ->select('ledger_entry_id')
-            ->selectRaw('SUM(amount) AS total_paid')
-            ->groupBy('ledger_entry_id');
-
-        $totalOutstanding = DB::table('ledger_entries')
-            ->join('customers', 'customers.id', '=', 'ledger_entries.customer_id')
-            ->where('customers.store_id', $storeId)
-            ->leftJoinSub($paymentsByEntry, 'payments_by_entry', function ($join): void {
-                $join->on('payments_by_entry.ledger_entry_id', '=', 'ledger_entries.id');
-            })
-            ->selectRaw('COALESCE(SUM(CASE WHEN ledger_entries.amount > COALESCE(payments_by_entry.total_paid, 0) THEN ledger_entries.amount - COALESCE(payments_by_entry.total_paid, 0) ELSE 0 END), 0) AS total_outstanding')
-            ->value('total_outstanding');
-
-        $today = now()->toDateString();
-
-        $overdueAccountCount = Customer::query()
-            ->where('store_id', $storeId)
-            ->whereHas('ledgerEntries', function (Builder $query) use ($today): void {
-                $query->where('repayment_deadline', '<', $today)
-                    ->whereRaw('ledger_entries.amount > COALESCE((SELECT SUM(payments.amount) FROM payments WHERE payments.ledger_entry_id = ledger_entries.id), 0)');
-            })
-            ->count();
+        $store = $request->user()->store;
+        $storeId = $store->getKey();
+        $storeSummary = $financialSummaryService->forStore($store);
 
         $recentCredits = LedgerEntry::query()
             ->with('customer')
@@ -127,8 +109,12 @@ class DashboardController extends Controller
             ->count();
 
         return view('dashboard', [
-            'totalCollectibles' => Money::fromCents(Money::toCents((string) ($totalOutstanding ?? '0'))),
-            'overdueAccountCount' => $overdueAccountCount,
+            'outstandingPrincipal' => $storeSummary['totals']['principal_outstanding'],
+            'outstandingPenalties' => $storeSummary['totals']['penalties_outstanding'],
+            'totalAmountDue' => $storeSummary['totals']['total_due'],
+            'overdueAccountCount' => $storeSummary['overdue_account_count'],
+            'customersWithOutstandingPenalties' => $storeSummary['customers_with_outstanding_penalties'],
+            'overdueCreditPenaltyStates' => $storeSummary['overdue_credit_penalty_states'],
             'recentPenaltyCount' => $recentPenaltyCount,
             'recentActivity' => $recentActivity,
             'storeIsSuspended' => ! $request->user()->store->isActive(),

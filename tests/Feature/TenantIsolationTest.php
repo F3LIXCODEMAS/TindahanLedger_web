@@ -68,7 +68,7 @@ it('totals dashboard collectibles from the owner store only', function () {
     $this->actingAs($owner)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertViewHas('totalCollectibles', '150.00');
+        ->assertViewHas('outstandingPrincipal', '150.00');
 });
 
 it('rejects updating another store customer without changing it', function () {

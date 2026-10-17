@@ -3318,3 +3318,74 @@ body.owner-auth-page {
     margin-top: 10px;
     font-size: 13px;
 }
+
+/* Late fee integration: principal, fees and total due */
+.ledger-financial-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin: -10px 0 24px;
+    padding: 14px 20px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.ledger-financial-summary dt,
+.overdue-totals dt {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.ledger-financial-summary dd,
+.overdue-totals dd {
+    margin: 2px 0 0;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-metrics.has-financials {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.metric-penalties {
+    border-top: 3px solid var(--color-ledger-gold);
+}
+
+.metric-penalty-counts {
+    display: grid;
+    gap: 4px;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.overdue-totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 0 0 20px;
+    padding: 14px 18px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.overdue-fee-only {
+    margin-top: 32px;
+}
+
+.portal-fee-terms {
+    display: block;
+    margin-top: 2px;
+    font-size: 13px;
+}
+
+@media (max-width: 600px) {
+    .ledger-financial-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 14px 16px;
+    }
+}

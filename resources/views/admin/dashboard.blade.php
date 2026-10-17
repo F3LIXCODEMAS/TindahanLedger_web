@@ -46,7 +46,7 @@
     <h2 class="admin-muted">Current balances (as of today)</h2>
     <section class="dashboard-metrics admin-metrics" aria-label="Current balances">
         <article class="metric-panel">
-            <h3 class="metric-note">Total outstanding debt</h3>
+            <h3 class="metric-note">Total outstanding debt (principal + late fees)</h3>
             <p class="metric-value">₱{{ $metrics['outstanding_balance'] }}</p>
             <p class="metric-note">Remaining unpaid credit across all stores</p>
         </article>
