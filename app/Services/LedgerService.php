@@ -135,7 +135,7 @@ class LedgerService
                 ->first();
 
             if ($existingPayment) {
-                if ($existingPayment->customer_id !== $lockedCustomer->id) {
+                if ($existingPayment->customer_id !== $lockedCustomer->id || $existingPayment->isLoyaltyRedemption()) {
                     throw new \InvalidArgumentException('This payment submission key belongs to another customer.');
                 }
 
@@ -175,49 +175,17 @@ class LedgerService
             }
 
             $paymentBatchId = Str::uuid()->toString();
-            $remainingPaymentInCents = $paymentAmountInCents;
-            $payments = collect();
-            $paymentDate = $attributes['payment_date'] ?? now()->toDateString();
-            $note = $attributes['note'] ?? null;
-            $outstandingEntries = $lockedCustomer->ledgerEntries()
-                ->withSum('payments as paid_amount', 'amount')
-                ->orderBy('transaction_date')
-                ->orderBy('created_at')
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
+            $payments = $this->allocateOldestFirst(
+                $lockedCustomer,
+                $paymentAmountInCents,
+                $attributes['payment_date'] ?? now()->toDateString(),
+                $attributes['note'] ?? null,
+                $paymentBatchId,
+                $attributes['idempotency_key'],
+                Payment::KIND_CASH,
+            );
 
-            foreach ($outstandingEntries as $ledgerEntry) {
-                if ($remainingPaymentInCents === 0) {
-                    break;
-                }
-
-                $entryBalanceInCents = max(
-                    0,
-                    Money::toCents($ledgerEntry->amount)
-                    - Money::toCents((string) ($ledgerEntry->paid_amount ?? '0')),
-                );
-
-                if ($entryBalanceInCents === 0) {
-                    continue;
-                }
-
-                $allocatedAmountInCents = min($entryBalanceInCents, $remainingPaymentInCents);
-                $isFirstAllocation = $payments->isEmpty();
-                $payment = $this->createPaymentAllocation(
-                    $lockedCustomer,
-                    $ledgerEntry,
-                    $allocatedAmountInCents,
-                    $paymentDate,
-                    $note,
-                    $paymentBatchId,
-                    $isFirstAllocation ? $attributes['idempotency_key'] : null,
-                );
-                $payments->push($payment);
-                $remainingPaymentInCents -= $allocatedAmountInCents;
-            }
-
-            if ($remainingPaymentInCents > 0) {
+            if ($payments === null) {
                 throw new PaymentExceedsBalance(
                     Money::fromCents($previousBalanceInCents),
                     Money::fromCents($paymentAmountInCents),
@@ -243,6 +211,200 @@ class LedgerService
         });
     }
 
+    /**
+     * Redeem Suki Points as a non-cash credit against the customer's debt.
+     *
+     * One point is worth SukiPoint::REDEMPTION_CENTS_PER_POINT. The credit is
+     * applied to the oldest unpaid credits first, never exceeds the current
+     * outstanding balance, earns no points, never completes a debt cycle, and
+     * is recorded as a `loyalty_redemption` allocation plus one points-ledger
+     * row. Points are deducted in the same transaction, with the customer and
+     * points rows locked, so the same points can never be spent twice.
+     * Repeating a request with the same idempotency key returns the original
+     * redemption without deducting again.
+     *
+     * @return array{
+     *     payment_batch_id: string,
+     *     points_redeemed: int,
+     *     redeemed_amount: string,
+     *     previous_balance: string,
+     *     remaining_balance: string,
+     *     points_balance: int,
+     *     was_repeated: bool
+     * }
+     */
+    public function redeemSukiPoints(Customer $customer, int $points, string $idempotencyKey, User $owner): array
+    {
+        return DB::transaction(function () use ($customer, $points, $idempotencyKey, $owner): array {
+            $lockedCustomer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+            $this->ensureStoreIsActive($lockedCustomer);
+            $sukiPoints = SukiPoint::query()->where('customer_id', $lockedCustomer->id)->lockForUpdate()->first();
+            $existingRedemption = Payment::query()->where('idempotency_key', $idempotencyKey)->first();
+
+            if ($existingRedemption) {
+                if ($existingRedemption->customer_id !== $lockedCustomer->id || ! $existingRedemption->isLoyaltyRedemption()) {
+                    throw new \InvalidArgumentException('This redemption submission key belongs to another transaction.');
+                }
+
+                $pointsLedgerRow = SukiPointTransaction::query()
+                    ->where('payment_id', $existingRedemption->id)
+                    ->firstOrFail();
+                $remainingBalanceInCents = $this->outstandingBalanceInCents($lockedCustomer);
+
+                return [
+                    'payment_batch_id' => $existingRedemption->payment_batch_id,
+                    'points_redeemed' => $pointsLedgerRow->points_redeemed,
+                    'redeemed_amount' => Money::fromCents($pointsLedgerRow->redeemed_amount_cents),
+                    'previous_balance' => Money::fromCents($remainingBalanceInCents + $pointsLedgerRow->redeemed_amount_cents),
+                    'remaining_balance' => Money::fromCents($remainingBalanceInCents),
+                    'points_balance' => $sukiPoints?->points_balance ?? 0,
+                    'was_repeated' => true,
+                ];
+            }
+
+            $availablePoints = $sukiPoints?->points_balance ?? 0;
+            $previousBalanceInCents = $this->outstandingBalanceInCents($lockedCustomer);
+            $maximumRedeemablePoints = $this->maximumRedeemablePoints($availablePoints, $previousBalanceInCents);
+
+            if ($points < 1) {
+                throw new SukiPointRedemptionRejected('Enter at least 1 point to redeem.');
+            }
+
+            if ($previousBalanceInCents === 0) {
+                throw new SukiPointRedemptionRejected('This customer has no outstanding balance to reduce.');
+            }
+
+            if ($points > $availablePoints) {
+                throw new SukiPointRedemptionRejected(sprintf(
+                    'This customer only has %s Suki %s available.',
+                    number_format($availablePoints),
+                    $availablePoints === 1 ? 'Point' : 'Points',
+                ));
+            }
+
+            $redeemedAmountInCents = $points * SukiPoint::REDEMPTION_CENTS_PER_POINT;
+
+            if ($redeemedAmountInCents > $previousBalanceInCents) {
+                throw new SukiPointRedemptionRejected(sprintf(
+                    'Redeeming %s points (₱%s) would exceed the outstanding balance of ₱%s. The most that can be redeemed now is %s points.',
+                    number_format($points),
+                    Money::fromCents($redeemedAmountInCents),
+                    Money::fromCents($previousBalanceInCents),
+                    number_format($maximumRedeemablePoints),
+                ));
+            }
+
+            $paymentBatchId = Str::uuid()->toString();
+            $allocations = $this->allocateOldestFirst(
+                $lockedCustomer,
+                $redeemedAmountInCents,
+                now()->toDateString(),
+                'Suki Points redemption: '.number_format($points).' '.($points === 1 ? 'point' : 'points'),
+                $paymentBatchId,
+                $idempotencyKey,
+                Payment::KIND_LOYALTY_REDEMPTION,
+            );
+
+            if ($allocations === null) {
+                throw new SukiPointRedemptionRejected('The redemption could not be applied to the outstanding credits.');
+            }
+
+            $sukiPoints->update(['points_balance' => $availablePoints - $points]);
+            $lockedCustomer->sukiPointTransactions()->create([
+                'payment_id' => $allocations->first()->id,
+                'transaction_type' => SukiPointTransaction::TYPE_REDEEMED,
+                'paid_amount_cents' => 0,
+                'points_awarded' => 0,
+                'points_redeemed' => $points,
+                'redeemed_amount_cents' => $redeemedAmountInCents,
+                'remainder_before_cents' => $sukiPoints->repayment_remainder_cents,
+                'remainder_after_cents' => $sukiPoints->repayment_remainder_cents,
+                'recorded_by_user_id' => $owner->id,
+            ]);
+
+            $newBalanceInCents = $this->outstandingBalanceInCents($lockedCustomer);
+            $lockedCustomer->update(['current_balance' => Money::fromCents($newBalanceInCents)]);
+
+            return [
+                'payment_batch_id' => $paymentBatchId,
+                'points_redeemed' => $points,
+                'redeemed_amount' => Money::fromCents($redeemedAmountInCents),
+                'previous_balance' => Money::fromCents($previousBalanceInCents),
+                'remaining_balance' => Money::fromCents($newBalanceInCents),
+                'points_balance' => $availablePoints - $points,
+                'was_repeated' => false,
+            ];
+        });
+    }
+
+    /**
+     * The most points that can be redeemed right now: limited by the points
+     * available and by the outstanding balance, in whole points.
+     */
+    public function maximumRedeemablePoints(int $availablePoints, int $outstandingBalanceInCents): int
+    {
+        return max(0, min($availablePoints, intdiv($outstandingBalanceInCents, SukiPoint::REDEMPTION_CENTS_PER_POINT)));
+    }
+
+    /**
+     * Apply an amount to the customer's unpaid credits, oldest first, as
+     * allocations sharing one batch. Returns null when the unpaid credits
+     * cannot absorb the whole amount. Only cash allocations earn points.
+     *
+     * @return Collection<int, Payment>|null
+     */
+    private function allocateOldestFirst(
+        Customer $lockedCustomer,
+        int $amountInCents,
+        string $paymentDate,
+        ?string $note,
+        string $paymentBatchId,
+        string $idempotencyKey,
+        string $kind,
+    ): ?Collection {
+        $remainingAmountInCents = $amountInCents;
+        $payments = collect();
+        $outstandingEntries = $lockedCustomer->ledgerEntries()
+            ->withSum('payments as paid_amount', 'amount')
+            ->orderBy('transaction_date')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($outstandingEntries as $ledgerEntry) {
+            if ($remainingAmountInCents === 0) {
+                break;
+            }
+
+            $entryBalanceInCents = max(
+                0,
+                Money::toCents($ledgerEntry->amount)
+                - Money::toCents((string) ($ledgerEntry->paid_amount ?? '0')),
+            );
+
+            if ($entryBalanceInCents === 0) {
+                continue;
+            }
+
+            $allocatedAmountInCents = min($entryBalanceInCents, $remainingAmountInCents);
+            $isFirstAllocation = $payments->isEmpty();
+            $payments->push($this->createPaymentAllocation(
+                $lockedCustomer,
+                $ledgerEntry,
+                $allocatedAmountInCents,
+                $paymentDate,
+                $note,
+                $paymentBatchId,
+                $isFirstAllocation ? $idempotencyKey : null,
+                $kind,
+            ));
+            $remainingAmountInCents -= $allocatedAmountInCents;
+        }
+
+        return $remainingAmountInCents > 0 ? null : $payments;
+    }
+
     private function createPaymentAllocation(
         Customer $customer,
         LedgerEntry $entry,
@@ -251,17 +413,21 @@ class LedgerService
         ?string $note = null,
         ?string $paymentBatchId = null,
         ?string $idempotencyKey = null,
+        string $kind = Payment::KIND_CASH,
     ): Payment {
         $payment = $entry->payments()->create([
             'customer_id' => $customer->id,
             'amount' => Money::fromCents($amountInCents),
+            'kind' => $kind,
             'payment_date' => $paymentDate,
             'note' => $note,
             'payment_batch_id' => $paymentBatchId,
             'idempotency_key' => $idempotencyKey,
         ]);
 
-        $this->awardRepaymentPoints($customer, $payment, $amountInCents);
+        if ($kind === Payment::KIND_CASH) {
+            $this->awardRepaymentPoints($customer, $payment, $amountInCents);
+        }
 
         return $payment;
     }
