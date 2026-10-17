@@ -170,15 +170,15 @@ it('links each customer record to its ledger page', function () {
         ->assertSee(route('customers.show', $customer));
 });
 
-it('keeps points carry-forward separate from completed cycle reward progress', function () {
+it('keeps points carry-forward separate from the paid-off streak', function () {
     $store = Store::factory()->create();
     $customer = Customer::factory()->for($store)->create(['credit_limit' => '5000.00']);
     SukiPoint::factory()->for($customer)->create([
         'points_balance' => 10,
         'repayment_remainder_cents' => 3000,
         'completed_cycles' => 1,
+        'current_cycle_count' => 1,
         'reward_threshold' => 3,
-        'reward_eligible' => false,
     ]);
 
     $response = $this->actingAs($store->owner)
@@ -188,18 +188,18 @@ it('keeps points carry-forward separate from completed cycle reward progress', f
         ->assertSeeText('10')
         ->assertSeeText('₱30.00 / ₱100.00')
         ->assertSeeText('1 / 3')
-        ->assertDontSeeText('Three-cycle reward achieved');
+        ->assertSeeText('2 more fully paid cycles until the bonus');
 });
 
-it('shows the three-cycle reward as achieved without resetting points', function () {
+it('shows the streak restarting after a bonus while keeping completed cycles and points', function () {
     $store = Store::factory()->create();
     $customer = Customer::factory()->for($store)->create();
     SukiPoint::factory()->for($customer)->create([
         'points_balance' => 10,
         'repayment_remainder_cents' => 7000,
         'completed_cycles' => 3,
+        'current_cycle_count' => 0,
         'reward_threshold' => 3,
-        'reward_eligible' => true,
     ]);
 
     $this->actingAs($store->owner)
@@ -207,8 +207,8 @@ it('shows the three-cycle reward as achieved without resetting points', function
         ->assertOk()
         ->assertSeeText('10')
         ->assertSeeText('₱70.00 / ₱100.00')
-        ->assertSeeText('3 / 3')
-        ->assertSeeText('Three-cycle reward achieved');
+        ->assertSeeText('0 / 3')
+        ->assertSeeText('3 completed in total');
 });
 
 it('shows only the selected customer repayment reminder history', function () {

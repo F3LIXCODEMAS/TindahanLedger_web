@@ -78,7 +78,7 @@
                             <div class="ledger-transaction-kind">
                                 <span class="ledger-transaction-marker" aria-hidden="true">{{ $transaction['type'] === 'credit' ? '+' : '-' }}</span>
                                 <div>
-                                    <strong>{{ $transaction['type'] === 'credit' ? 'Credit' : 'Payment' }}</strong>
+                                    <strong>{{ match ($transaction['type']) { 'credit' => 'Credit', 'loyalty_redemption' => 'Suki Points redemption', default => 'Payment' } }}</strong>
                                     <time datetime="{{ $transaction['date']->toDateString() }}">{{ $transaction['date']->format('M j, Y') }}</time>
                                 </div>
                             </div>
@@ -89,8 +89,14 @@
                         <dl class="ledger-transaction-details">
                             <div class="ledger-transaction-description">
                                 <dt>Description</dt>
-                                <dd>{{ $transaction['type'] === 'credit' ? (count($transaction['items']) > 0 ? implode(', ', $transaction['items']) : 'Credit entry') : 'Cash payment' }}</dd>
+                                <dd>{{ $transaction['type'] === 'credit' ? (count($transaction['items']) > 0 ? implode(', ', $transaction['items']) : 'Credit entry') : $transaction['description'] }}</dd>
                             </div>
+                            @if ($transaction['type'] === 'loyalty_redemption')
+                                <div>
+                                    <dt>Points redeemed</dt>
+                                    <dd>{{ number_format($transaction['points_redeemed']) }} {{ $transaction['points_redeemed'] === 1 ? 'point' : 'points' }} (not cash)</dd>
+                                </div>
+                            @endif
                             @if ($transaction['note'])
                                 <div>
                                     <dt>Note</dt>

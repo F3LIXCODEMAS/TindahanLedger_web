@@ -337,3 +337,45 @@ if (portalAccessForm instanceof HTMLFormElement) {
 document.querySelectorAll('[data-print-page]').forEach((printButton) => {
 	printButton.addEventListener('click', () => window.print());
 });
+
+const sukiRedeemForm = document.querySelector('[data-suki-redeem-form]');
+
+if (sukiRedeemForm instanceof HTMLFormElement) {
+	const pointsInput = sukiRedeemForm.querySelector('input[name="points"]');
+	const creditOutput = sukiRedeemForm.querySelector('[data-redeem-credit]');
+	const balanceOutput = sukiRedeemForm.querySelector('[data-redeem-balance]');
+	const submitButton = sukiRedeemForm.querySelector('[data-redeem-submit]');
+	const centsPerPoint = Number(sukiRedeemForm.dataset.centsPerPoint);
+	const balanceCents = Number(sukiRedeemForm.dataset.balanceCents);
+	const peso = (cents) => `₱${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+
+	// Preview only: the server recalculates and validates the redemption.
+	const updatePreview = () => {
+		if (!(pointsInput instanceof HTMLInputElement) || !creditOutput || !balanceOutput) {
+			return;
+		}
+
+		const points = Number(pointsInput.value);
+
+		if (!Number.isInteger(points) || points < 1) {
+			creditOutput.textContent = '—';
+			balanceOutput.textContent = '—';
+			return;
+		}
+
+		const creditCents = points * centsPerPoint;
+		creditOutput.textContent = peso(creditCents);
+		balanceOutput.textContent = creditCents > balanceCents ? 'More than the balance' : peso(balanceCents - creditCents);
+	};
+
+	pointsInput?.addEventListener('input', updatePreview);
+	updatePreview();
+
+	// Runs after the confirmation handler on document; only disable once the submit really proceeds.
+	window.addEventListener('submit', (event) => {
+		if (event.target === sukiRedeemForm && !event.defaultPrevented && submitButton instanceof HTMLButtonElement) {
+			submitButton.disabled = true;
+			submitButton.textContent = 'Redeeming…';
+		}
+	});
+}

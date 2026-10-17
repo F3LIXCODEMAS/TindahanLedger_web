@@ -21,6 +21,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\Portal\PortalAccessController;
 use App\Http\Controllers\StoreEmailSettingsController;
+use App\Http\Controllers\SukiPointRedemptionController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -110,6 +111,9 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::match(['put', 'patch'], '/customers/{customer}', [CustomerController::class, 'update'])
             ->name('customers.update');
+
+        Route::post('/customers/{customer}/suki-points/redemptions', [SukiPointRedemptionController::class, 'store'])
+            ->name('customers.suki-redemptions.store');
     });
 
     Route::middleware('private.headers')->group(function () {

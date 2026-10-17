@@ -64,7 +64,7 @@
                 @foreach ($transactions as $transaction)
                     <li>
                         <div>
-                            <strong>{{ $transaction['type'] === 'credit' ? 'Credit' : 'Payment' }}</strong>
+                            <strong>{{ match ($transaction['type']) { 'credit' => 'Credit', 'loyalty_redemption' => 'Suki Points redeemed', default => 'Payment' } }}</strong>
                             <span class="portal-muted">{{ $transaction['date']->format('M j, Y') }}</span>
                             @if ($transaction['items'] !== [])
                                 <span class="portal-muted">{{ implode(', ', $transaction['items']) }}</span>
@@ -91,7 +91,7 @@
                             @endif
                         </div>
                         <div class="portal-amount">
-                            <span class="{{ $transaction['type'] === 'payment' ? 'is-payment' : '' }}">{{ $transaction['type'] === 'payment' ? '−' : '+' }}₱{{ $transaction['amount'] }}</span>
+                            <span class="{{ $transaction['type'] !== 'credit' ? 'is-payment' : '' }}">{{ $transaction['type'] !== 'credit' ? '−' : '+' }}₱{{ $transaction['amount'] }}</span>
                             <span class="portal-muted">Balance ₱{{ $transaction['running_balance'] }}</span>
                         </div>
                     </li>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Payment;
 use App\Models\Store;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
@@ -83,7 +84,7 @@ class PlatformAnalyticsService
             $periodEnd,
         );
         $dailyPayments = $this->dailyTotals(
-            DB::table('payments'),
+            DB::table('payments')->where('kind', Payment::KIND_CASH),
             'payment_date',
             'COUNT(DISTINCT COALESCE(payment_batch_id, CAST(id AS CHAR)))',
             $periodStart,
@@ -175,7 +176,7 @@ class PlatformAnalyticsService
     public function storeComparison(CarbonImmutable $periodStart, CarbonImmutable $periodEnd, string $sort, string $direction): EloquentBuilder
     {
         $periodCredits = $this->periodTotalsByStore(DB::table('ledger_entries'), 'ledger_entries', 'transaction_date', $periodStart, $periodEnd);
-        $periodPayments = $this->periodTotalsByStore(DB::table('payments'), 'payments', 'payment_date', $periodStart, $periodEnd);
+        $periodPayments = $this->periodTotalsByStore(DB::table('payments')->where('payments.kind', Payment::KIND_CASH), 'payments', 'payment_date', $periodStart, $periodEnd);
         $lastActivity = DB::query()
             ->fromSub(
                 $this->recordedAtByStore('ledger_entries')->unionAll($this->recordedAtByStore('payments')),

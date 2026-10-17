@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Payment;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -21,6 +22,11 @@ class TransactionMonitoringService
     public const TYPE_CREDIT = 'credit';
 
     public const TYPE_PAYMENT = 'payment';
+
+    /** Suki Points redeemed as store credit: reduces debt but is not cash received. */
+    public const TYPE_REDEMPTION = 'loyalty_redemption';
+
+    public const TYPES = [self::TYPE_CREDIT, self::TYPE_PAYMENT, self::TYPE_REDEMPTION];
 
     /**
      * Allowed sort keys mapped to their columns.
@@ -65,7 +71,7 @@ class TransactionMonitoringService
                 ? Money::fromCents(Money::sumToCents($transaction->remaining_amount))
                 : null;
             $transaction->status = match (true) {
-                $transaction->transaction_type === self::TYPE_PAYMENT => null,
+                $transaction->transaction_type !== self::TYPE_CREDIT => null,
                 $transaction->remaining_amount === '0.00' => 'Paid',
                 $transaction->repayment_deadline !== null
                     && substr((string) $transaction->repayment_deadline, 0, 10) < $today => 'Overdue',
@@ -111,11 +117,13 @@ class TransactionMonitoringService
             return $this->credits($filters);
         }
 
-        if ($type === self::TYPE_PAYMENT) {
-            return $this->payments($filters);
+        if ($type === self::TYPE_PAYMENT || $type === self::TYPE_REDEMPTION) {
+            return $this->payments($filters, $type);
         }
 
-        return $this->credits($filters)->unionAll($this->payments($filters));
+        return $this->credits($filters)
+            ->unionAll($this->payments($filters, self::TYPE_PAYMENT))
+            ->unionAll($this->payments($filters, self::TYPE_REDEMPTION));
     }
 
     /**
@@ -153,12 +161,13 @@ class TransactionMonitoringService
     /**
      * @param  array{from?: string|null, to?: string|null, store_id?: int|string|null, customer?: string|null}  $filters
      */
-    private function payments(array $filters): Builder
+    private function payments(array $filters, string $type): Builder
     {
         $payments = DB::table('payments')
             ->join('customers', 'customers.id', '=', 'payments.customer_id')
             ->join('stores', 'stores.id', '=', 'customers.store_id')
-            ->selectRaw('? AS transaction_type', [self::TYPE_PAYMENT])
+            ->where('payments.kind', $type === self::TYPE_REDEMPTION ? Payment::KIND_LOYALTY_REDEMPTION : Payment::KIND_CASH)
+            ->selectRaw('? AS transaction_type', [$type])
             ->selectRaw('MIN(payments.id) AS reference_id')
             ->selectRaw('MAX(payments.payment_date) AS transaction_date')
             ->selectRaw('MAX(payments.created_at) AS recorded_at')

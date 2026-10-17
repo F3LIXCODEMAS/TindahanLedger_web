@@ -3216,3 +3216,50 @@ body.owner-auth-page {
     margin-top: 20px;
     text-align: center;
 }
+
+/* Suki Points redemption on the customer ledger */
+.suki-redeem {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-ledger-line);
+}
+
+.suki-redeem h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+}
+
+.suki-redeem-unavailable {
+    margin: 10px 0 0;
+    padding: 12px 14px;
+    border-radius: 6px;
+    color: var(--color-ledger-muted);
+    background: var(--color-ledger-paper);
+    font-size: 14px;
+}
+
+.suki-redeem-form {
+    display: grid;
+    gap: 12px;
+    max-width: 520px;
+    margin-top: 12px;
+}
+
+.suki-redeem-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin: 0;
+}
+
+.suki-redeem-preview dt {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.suki-redeem-preview dd {
+    margin: 2px 0 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}

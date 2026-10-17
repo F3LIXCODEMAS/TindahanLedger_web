@@ -35,6 +35,10 @@
             <a class="customer-edit-link" href="{{ route('customers.edit', $customer) }}">Edit details</a>
         </header>
 
+        @if (session('status'))
+            <p class="status-banner" role="status">{{ session('status') }}</p>
+        @endif
+
         @if ($ledger['is_overdue'])
             <p class="ledger-overdue-banner" role="status">
                 {{ $ledger['overdue_entry_count'] }} overdue {{ $ledger['overdue_entry_count'] === 1 ? 'transaction' : 'transactions' }}
@@ -93,36 +97,7 @@
             </div>
         </section>
 
-        <section class="customer-ledger-section" aria-labelledby="rewards-title">
-            <div class="ledger-section-heading">
-                <div>
-                    <p class="eyebrow">CUSTOMER REWARDS</p>
-                    <h2 id="rewards-title">Suki rewards</h2>
-                </div>
-            </div>
-            <div class="ledger-reward-grid">
-                <article class="ledger-reward-panel ledger-points-panel">
-                    <div class="ledger-reward-heading">
-                        <h3>Suki Points</h3>
-                        <span class="ledger-points-mark" aria-hidden="true">SP</span>
-                    </div>
-                    <p class="ledger-reward-value">{{ number_format($ledger['rewards']['points_balance']) }} <span>points</span></p>
-                    <p class="ledger-reward-progress-label">Progress to next point</p>
-                    <p class="ledger-reward-progress">₱{{ $ledger['rewards']['remainder_amount'] }} / ₱{{ $ledger['rewards']['point_threshold'] }}</p>
-                </article>
-                <article class="ledger-reward-panel ledger-cycle-panel">
-                    <div class="ledger-reward-heading">
-                        <h3>Debt cycle reward</h3>
-                        <span class="ledger-cycle-mark" aria-hidden="true">3×</span>
-                    </div>
-                    <p class="ledger-reward-progress">{{ $ledger['rewards']['cycle_progress'] }} / {{ $ledger['rewards']['reward_threshold'] }}</p>
-                    <p class="ledger-reward-progress-label">Completed debt cycles</p>
-                    <p class="ledger-cycle-status {{ $ledger['rewards']['reward_achieved'] ? 'is-achieved' : '' }}">
-                        {{ $ledger['rewards']['reward_achieved'] ? 'Three-cycle reward achieved' : 'Progress toward three-cycle reward' }}
-                    </p>
-                </article>
-            </div>
-        </section>
+        @include('customers.partials.suki-points')
 
         @include('customers.partials.ledger-history')
     </main>

@@ -182,7 +182,7 @@ class StoreController extends Controller
             ->get()
             ->groupBy(fn (Payment $payment): string => $payment->payment_batch_id ?? 'payment-'.$payment->id)
             ->map(fn (Collection $allocations): array => [
-                'type' => 'Payment',
+                'type' => $allocations->first()->isLoyaltyRedemption() ? 'Suki Points redeemed' : 'Payment',
                 'customer_name' => $allocations->first()->customer->full_name,
                 'amount' => Money::fromCents($allocations->sum(fn (Payment $payment): int => Money::toCents($payment->amount))),
                 'occurred_at' => $allocations->max('created_at'),

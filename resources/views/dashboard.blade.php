@@ -99,7 +99,7 @@
             @else
                 <ol class="activity-list">
                     @foreach ($recentActivity as $activity)
-                        @php($isPayment = $activity['type'] === 'Payment received')
+                        @php($isPayment = $activity['type'] !== 'Credit recorded')
                         <li class="activity-row">
                             <span class="activity-indicator {{ $isPayment ? 'is-payment' : 'is-credit' }}" aria-hidden="true">
                                 {{ $isPayment ? '−' : '+' }}

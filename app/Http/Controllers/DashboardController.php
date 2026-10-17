@@ -60,20 +60,20 @@ class DashboardController extends Controller
 
         $recentBatchedPayments = DB::table('payments')
             ->join('customers', 'customers.id', '=', 'payments.customer_id')
-            ->select('payments.payment_batch_id', 'payments.customer_id', 'customers.full_name')
+            ->select('payments.payment_batch_id', 'payments.customer_id', 'payments.kind', 'customers.full_name')
             ->selectRaw('SUM(payments.amount) AS amount')
             ->selectRaw('MAX(payments.created_at) AS created_at')
             ->selectRaw('MAX(payments.id) AS id')
             ->where('customers.store_id', $storeId)
             ->whereNotNull('payments.payment_batch_id')
-            ->groupBy('payments.payment_batch_id', 'payments.customer_id', 'customers.full_name')
+            ->groupBy('payments.payment_batch_id', 'payments.customer_id', 'payments.kind', 'customers.full_name')
             ->orderByDesc(DB::raw('MAX(payments.created_at)'))
             ->orderByDesc(DB::raw('MAX(payments.id)'))
             ->limit(8)
             ->get()
             ->map(fn (object $payment): array => [
                 'id' => 'payment-'.$payment->payment_batch_id,
-                'type' => 'Payment received',
+                'type' => $payment->kind === Payment::KIND_LOYALTY_REDEMPTION ? 'Suki Points redeemed' : 'Payment received',
                 'customer_name' => $payment->full_name,
                 'amount' => Money::fromCents(Money::toCents((string) $payment->amount)),
                 'created_at' => Carbon::parse($payment->created_at),

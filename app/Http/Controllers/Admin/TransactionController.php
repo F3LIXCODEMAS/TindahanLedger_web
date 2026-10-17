@@ -20,7 +20,7 @@ class TransactionController extends Controller
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'store_id' => ['nullable', 'integer'],
-            'type' => ['nullable', Rule::in([TransactionMonitoringService::TYPE_CREDIT, TransactionMonitoringService::TYPE_PAYMENT])],
+            'type' => ['nullable', Rule::in(TransactionMonitoringService::TYPES)],
             'customer' => ['nullable', 'string', 'max:120'],
             'sort' => ['nullable', Rule::in(array_keys(TransactionMonitoringService::SORT_COLUMNS))],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],

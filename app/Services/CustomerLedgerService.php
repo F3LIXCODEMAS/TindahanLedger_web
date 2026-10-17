@@ -25,9 +25,11 @@ class CustomerLedgerService
      *         remainder_amount: string,
      *         point_threshold: string,
      *         completed_cycles: int,
-     *         cycle_progress: int,
+     *         current_streak: int,
      *         reward_threshold: int,
-     *         reward_achieved: bool
+     *         cycles_until_reward: int,
+     *         redemption_peso_per_point: string,
+     *         max_redeemable_points: int
      *     }
      * }
      */
@@ -39,6 +41,7 @@ class CustomerLedgerService
             ->orderBy('id')
             ->get();
         $payments = $customer->payments()
+            ->with('sukiPointTransaction')
             ->orderBy('payment_date')
             ->orderBy('created_at')
             ->orderBy('id')
@@ -75,6 +78,7 @@ class CustomerLedgerService
                 'record_id' => $entry->id,
                 'type' => 'credit',
                 'type_order' => 0,
+                'points_redeemed' => null,
                 'date' => $entry->transaction_date,
                 'recorded_at' => $entry->created_at,
                 'amount_in_cents' => Money::toCents($entry->amount),
@@ -98,14 +102,16 @@ class CustomerLedgerService
         foreach ($paymentGroups as $paymentGroup) {
             $firstPayment = $paymentGroup->first();
             $lastPayment = $paymentGroup->last();
+            $isRedemption = $firstPayment->isLoyaltyRedemption();
 
             $events[] = [
                 'id' => $firstPayment->payment_batch_id
                     ? 'payment-'.$firstPayment->payment_batch_id
                     : 'payment-'.$firstPayment->id,
                 'record_id' => $lastPayment->id,
-                'type' => 'payment',
+                'type' => $isRedemption ? 'loyalty_redemption' : 'payment',
                 'type_order' => 1,
+                'points_redeemed' => $isRedemption ? ($firstPayment->sukiPointTransaction?->points_redeemed ?? 0) : null,
                 'date' => $firstPayment->payment_date,
                 'recorded_at' => $lastPayment->created_at,
                 'amount_in_cents' => $paymentGroup->sum(
@@ -155,7 +161,12 @@ class CustomerLedgerService
                 'recorded_at' => $event['recorded_at'],
                 'amount' => Money::fromCents($event['amount_in_cents']),
                 'note' => $event['note'],
-                'description' => $event['type'] === 'payment' ? 'Cash payment' : null,
+                'description' => match ($event['type']) {
+                    'payment' => 'Cash payment',
+                    'loyalty_redemption' => 'Suki Points redeemed as store credit',
+                    default => null,
+                },
+                'points_redeemed' => $event['points_redeemed'],
                 'items' => $event['items'],
                 'deadline' => $event['deadline'],
                 'remaining_amount' => $event['remaining_amount_in_cents'] === null
@@ -168,8 +179,9 @@ class CustomerLedgerService
 
         $sukiPoints = $customer->sukiPoints()->first();
         $rewardThreshold = max(1, $sukiPoints?->reward_threshold ?? 3);
-        $completedCycles = $sukiPoints?->completed_cycles ?? 0;
+        $currentStreak = $sukiPoints?->current_cycle_count ?? 0;
         $remainderCents = $sukiPoints?->repayment_remainder_cents ?? 0;
+        $pointsBalance = $sukiPoints?->points_balance ?? 0;
 
         return [
             'outstanding_balance' => $financialSummary['outstanding_balance'],
@@ -178,14 +190,19 @@ class CustomerLedgerService
             'overdue_entry_count' => $overdueEntryCount,
             'transactions' => $transactions,
             'rewards' => [
-                'points_balance' => $sukiPoints?->points_balance ?? 0,
+                'points_balance' => $pointsBalance,
                 'remainder_cents' => $remainderCents,
                 'remainder_amount' => Money::fromCents($remainderCents),
                 'point_threshold' => Money::fromCents(SukiPoint::CENTS_PER_POINT),
-                'completed_cycles' => $completedCycles,
-                'cycle_progress' => min($completedCycles, $rewardThreshold),
+                'completed_cycles' => $sukiPoints?->completed_cycles ?? 0,
+                'current_streak' => $currentStreak,
                 'reward_threshold' => $rewardThreshold,
-                'reward_achieved' => $completedCycles >= $rewardThreshold,
+                'cycles_until_reward' => max(0, $rewardThreshold - $currentStreak),
+                'redemption_peso_per_point' => Money::fromCents(SukiPoint::REDEMPTION_CENTS_PER_POINT),
+                'max_redeemable_points' => $this->ledgerService->maximumRedeemablePoints(
+                    $pointsBalance,
+                    Money::toCents($financialSummary['outstanding_balance']),
+                ),
             ],
         ];
     }

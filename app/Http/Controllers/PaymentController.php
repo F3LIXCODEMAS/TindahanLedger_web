@@ -111,6 +111,7 @@ class PaymentController extends Controller
     public function confirmation(Request $request, string $paymentBatchId, LedgerService $ledgerService): View
     {
         $payments = Payment::query()
+            ->cash()
             ->with('customer')
             ->whereRelation('customer', 'store_id', $request->user()->store->getKey())
             ->where('payment_batch_id', $paymentBatchId)

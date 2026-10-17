@@ -33,6 +33,7 @@
                 <option value="" @selected($filters['type'] === null)>Credits and payments</option>
                 <option value="credit" @selected($filters['type'] === 'credit')>Credits only</option>
                 <option value="payment" @selected($filters['type'] === 'payment')>Payments only</option>
+                <option value="loyalty_redemption" @selected($filters['type'] === 'loyalty_redemption')>Suki Points redemptions only</option>
             </select>
         </div>
         <div class="admin-field">
@@ -98,7 +99,7 @@
                             </td>
                             <td data-label="Store"><a href="{{ route('admin.stores.show', $transaction->store_id) }}">{{ $transaction->store_name }}</a></td>
                             <td data-label="Customer"><a href="{{ route('admin.stores.customers.show', [$transaction->store_id, $transaction->customer_id]) }}">{{ $transaction->customer_name }}</a></td>
-                            <td data-label="Type">{{ $transaction->transaction_type === 'credit' ? 'Credit' : 'Payment' }}</td>
+                            <td data-label="Type">{{ match ($transaction->transaction_type) { 'credit' => 'Credit', 'loyalty_redemption' => 'Suki Points redemption', default => 'Payment' } }}</td>
                             <td data-label="Amount" class="is-amount">₱{{ $transaction->amount }}</td>
                             <td data-label="Deadline">{{ $transaction->repayment_deadline ? \Illuminate\Support\Carbon::parse($transaction->repayment_deadline)->format('M j, Y') : '—' }}</td>
                             <td data-label="Status">
