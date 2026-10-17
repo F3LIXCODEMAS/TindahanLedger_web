@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Models\Store;
 use App\Support\Money;
@@ -77,7 +78,7 @@ class PlatformAnalyticsService
         }
 
         $dailyCredits = $this->dailyTotals(
-            DB::table('ledger_entries'),
+            DB::table('ledger_entries')->where('kind', LedgerEntry::KIND_CREDIT),
             'transaction_date',
             'COUNT(*)',
             $periodStart,
@@ -175,7 +176,7 @@ class PlatformAnalyticsService
      */
     public function storeComparison(CarbonImmutable $periodStart, CarbonImmutable $periodEnd, string $sort, string $direction): EloquentBuilder
     {
-        $periodCredits = $this->periodTotalsByStore(DB::table('ledger_entries'), 'ledger_entries', 'transaction_date', $periodStart, $periodEnd);
+        $periodCredits = $this->periodTotalsByStore(DB::table('ledger_entries')->where('ledger_entries.kind', LedgerEntry::KIND_CREDIT), 'ledger_entries', 'transaction_date', $periodStart, $periodEnd);
         $periodPayments = $this->periodTotalsByStore(DB::table('payments')->where('payments.kind', Payment::KIND_CASH), 'payments', 'payment_date', $periodStart, $periodEnd);
         $lastActivity = DB::query()
             ->fromSub(

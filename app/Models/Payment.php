@@ -23,7 +23,13 @@ class Payment extends Model
     public const KIND_LOYALTY_REDEMPTION = 'loyalty_redemption';
 
     /**
-     * Payments are only created by LedgerService; `kind` is never taken from
+     * An owner waiving an unpaid late penalty. It clears the penalty like a
+     * payment but is not money received and earns no Suki Points.
+     */
+    public const KIND_PENALTY_WAIVER = 'penalty_waiver';
+
+    /**
+     * Payments are only created by LedgerService and LatePenaltyService; `kind` is never taken from
      * request input.
      *
      * @var list<string>

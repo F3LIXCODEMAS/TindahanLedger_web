@@ -73,17 +73,18 @@
         @else
             <ol class="ledger-history-list">
                 @foreach ($ledger['transactions'] as $transaction)
-                    <li class="ledger-transaction {{ $transaction['type'] === 'credit' ? 'is-credit' : 'is-payment' }}">
+                    @php($addsToDebt = in_array($transaction['type'], \App\Services\CustomerLedgerService::DEBT_TYPES, true))
+                    <li class="ledger-transaction {{ $addsToDebt ? 'is-credit' : 'is-payment' }}">
                         <div class="ledger-transaction-heading">
                             <div class="ledger-transaction-kind">
-                                <span class="ledger-transaction-marker" aria-hidden="true">{{ $transaction['type'] === 'credit' ? '+' : '-' }}</span>
+                                <span class="ledger-transaction-marker" aria-hidden="true">{{ $addsToDebt ? '+' : '-' }}</span>
                                 <div>
-                                    <strong>{{ match ($transaction['type']) { 'credit' => 'Credit', 'loyalty_redemption' => 'Suki Points redemption', default => 'Payment' } }}</strong>
+                                    <strong>{{ match ($transaction['type']) { 'credit' => 'Credit', 'loyalty_redemption' => 'Suki Points redemption', 'late_penalty' => 'Late payment fee', 'penalty_waiver' => 'Late fee waived', default => 'Payment' } }}</strong>
                                     <time datetime="{{ $transaction['date']->toDateString() }}">{{ $transaction['date']->format('M j, Y') }}</time>
                                 </div>
                             </div>
                             <strong class="ledger-transaction-amount">
-                                {{ $transaction['type'] === 'credit' ? '+' : '-' }}₱{{ $transaction['amount'] }}
+                                {{ $addsToDebt ? '+' : '-' }}₱{{ $transaction['amount'] }}
                             </strong>
                         </div>
                         <dl class="ledger-transaction-details">
@@ -120,6 +121,45 @@
                             <p class="ledger-transaction-overdue" role="status">
                                 Overdue · ₱{{ $transaction['remaining_amount'] }} remaining
                             </p>
+                        @endif
+                        @php($penalty = $transaction['penalty_status'])
+                        @if ($penalty && $penalty['state'] !== \App\Services\LatePenaltyService::STATE_NOT_COVERED)
+                            <p class="ledger-penalty-status is-{{ $penalty['state'] }}">
+                                Late fee policy: ₱{{ $penalty['fee'] }} after {{ $penalty['grace_ends_on']->format('M j, Y') }} ·
+                                @switch($penalty['state'])
+                                    @case(\App\Services\LatePenaltyService::STATE_NOT_DUE)
+                                        Not yet due
+                                        @break
+                                    @case(\App\Services\LatePenaltyService::STATE_IN_GRACE)
+                                        In grace period until {{ $penalty['grace_ends_on']->format('M j') }}
+                                        @break
+                                    @case(\App\Services\LatePenaltyService::STATE_ELIGIBLE)
+                                        Grace period over; the fee will be added at the next daily run
+                                        @break
+                                    @case(\App\Services\LatePenaltyService::STATE_APPLIED)
+                                        Late fee applied on {{ $penalty['penalty']->transaction_date->format('M j, Y') }}
+                                        @break
+                                    @case(\App\Services\LatePenaltyService::STATE_WAIVED)
+                                        Late fee applied and later waived
+                                        @break
+                                    @default
+                                        Paid on time, no fee
+                                @endswitch
+                            </p>
+                        @endif
+                        @if ($transaction['type'] === 'late_penalty')
+                            @if ($transaction['penalty_waived_at'])
+                                <p class="ledger-penalty-status is-waived">
+                                    Waived {{ $transaction['penalty_waived_at']->format('M j, Y') }} · Reason: {{ $transaction['penalty_waiver_reason'] }}
+                                </p>
+                            @elseif ($transaction['can_waive'] && ($canManagePenalties ?? false))
+                                <form class="ledger-penalty-waive" method="POST" action="{{ route('customers.late-penalties.waive', [$customer, $transaction['penalty_entry_id']]) }}" data-confirm="Waive the unpaid part of this late payment fee? This is recorded and cannot be undone.">
+                                    @csrf
+                                    <label for="waive-reason-{{ $transaction['penalty_entry_id'] }}">Reason for waiving</label>
+                                    <input class="auth-input" id="waive-reason-{{ $transaction['penalty_entry_id'] }}" name="reason" type="text" maxlength="500" required placeholder="e.g. Customer paid on time in cash, recorded late">
+                                    <button class="customer-edit-link" type="submit">Waive fee</button>
+                                </form>
+                            @endif
                         @endif
                     </li>
                 @endforeach

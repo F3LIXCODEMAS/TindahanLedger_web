@@ -17,6 +17,7 @@
             <a class="owner-nav-link is-current" href="{{ route('dashboard') }}" aria-current="page">Dashboard</a>
             <a class="owner-nav-link" href="{{ route('overdue-accounts.index') }}">Overdue accounts</a>
             <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
+            <a class="owner-nav-link" href="{{ route('late-penalties.edit') }}">Late payment policy</a>
             <a class="owner-nav-link" href="{{ route('password.edit') }}">Change password</a>
             <span class="owner-name">{{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">
@@ -60,6 +61,9 @@
                 </div>
                 <p class="metric-value">{{ $overdueAccountCount }}</p>
                 <a class="metric-note overdue-metric-link" href="{{ route('overdue-accounts.index') }}">Review overdue customers</a>
+                @if ($recentPenaltyCount > 0)
+                    <p class="metric-note" role="status">{{ $recentPenaltyCount }} late payment {{ $recentPenaltyCount === 1 ? 'fee was' : 'fees were' }} added in the last 7 days.</p>
+                @endif
             </article>
         </section>
 
@@ -99,7 +103,7 @@
             @else
                 <ol class="activity-list">
                     @foreach ($recentActivity as $activity)
-                        @php($isPayment = $activity['type'] !== 'Credit recorded')
+                        @php($isPayment = ! in_array($activity['type'], ['Credit recorded', 'Late payment fee'], true))
                         <li class="activity-row">
                             <span class="activity-indicator {{ $isPayment ? 'is-payment' : 'is-credit' }}" aria-hidden="true">
                                 {{ $isPayment ? '−' : '+' }}

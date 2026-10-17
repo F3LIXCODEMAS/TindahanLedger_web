@@ -2,7 +2,13 @@
         <article class="ledger-balance-panel ledger-balance-primary">
             <p class="eyebrow">CURRENT OUTSTANDING</p>
             <p class="ledger-balance-value">₱{{ $ledger['outstanding_balance'] }}</p>
-            <p class="ledger-balance-note">Unpaid balance across all credit entries</p>
+            @if ($ledger['penalty_outstanding'] !== '0.00')
+                <p class="ledger-balance-note">
+                    Principal ₱{{ $ledger['principal_outstanding'] }} + late fees ₱{{ $ledger['penalty_outstanding'] }}
+                </p>
+            @else
+                <p class="ledger-balance-note">Unpaid balance across all credit entries</p>
+            @endif
         </article>
         <article class="ledger-balance-panel">
             <p class="eyebrow">CREDIT LIMIT</p>

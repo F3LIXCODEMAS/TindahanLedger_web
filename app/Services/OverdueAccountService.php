@@ -13,10 +13,13 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class OverdueAccountService
 {
+    public function __construct(private readonly LatePenaltyService $latePenaltyService) {}
+
     public function paginate(Store $store, string $search, string $sort): LengthAwarePaginator
     {
         $timezone = (string) config('app.timezone');
         $today = CarbonImmutable::now($timezone)->startOfDay();
+        $penaltyToday = $this->latePenaltyService->today();
 
         $isUnpaidAndOverdue = static function (Builder|Relation $query) use ($today): void {
             $query
@@ -48,6 +51,7 @@ class OverdueAccountService
                     $query
                         ->withSum('payments as paid_amount', 'amount')
                         ->with([
+                            'latePenalty',
                             'emailReminderLogs' => fn (Relation $reminders): Relation => $reminders
                                 ->orderByDesc('scheduled_reminder_date')
                                 ->orderByDesc('id'),
@@ -78,7 +82,7 @@ class OverdueAccountService
             ->paginate(20)
             ->withQueryString();
 
-        $customers->getCollection()->each(function (Customer $customer) use ($today, $timezone): void {
+        $customers->getCollection()->each(function (Customer $customer) use ($today, $timezone, $penaltyToday): void {
             $creditTotalInCents = Money::toCents((string) ($customer->ledger_credit_total ?? '0'));
             $paymentTotalInCents = Money::toCents((string) ($customer->customer_payment_total ?? '0'));
             $customer->setAttribute(
@@ -100,6 +104,7 @@ class OverdueAccountService
 
                 $entry->setAttribute('outstanding_balance', Money::fromCents($remainingAmountInCents));
                 $entry->setAttribute('days_overdue', $entryOverdueDays);
+                $entry->setAttribute('penalty_status', $this->latePenaltyService->statusFor($entry, $remainingAmountInCents, $entry->latePenalty, $penaltyToday));
                 $overdueDays = max($overdueDays, $entryOverdueDays);
             }
 

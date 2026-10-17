@@ -9,6 +9,7 @@ use App\Mail\CreditEntryReceipt;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\User;
+use App\Services\LatePenaltyService;
 use App\Services\LedgerService;
 use App\Services\MailDeliveryService;
 use Illuminate\Http\JsonResponse;
@@ -21,8 +22,9 @@ use Throwable;
 
 class CreditController extends Controller
 {
-    public function create(Request $request, LedgerService $ledgerService): View
+    public function create(Request $request, LedgerService $ledgerService, LatePenaltyService $latePenaltyService): View
     {
+        $penaltyPolicy = $latePenaltyService->activePolicyFor($request->user()->store);
         $customers = $request->user()->store->customers()
             ->orderBy('full_name')
             ->orderBy('id')
@@ -39,6 +41,7 @@ class CreditController extends Controller
                 ? $ledgerService->financialSummary($selectedCustomer)
                 : null,
             'idempotencyKey' => Str::uuid()->toString(),
+            'penaltyPolicy' => $penaltyPolicy,
         ]);
     }
 
@@ -68,6 +71,7 @@ class CreditController extends Controller
                 'note' => $validated['note'] ?? null,
                 'repayment_deadline' => $validated['repayment_deadline'] ?? null,
                 'idempotency_key' => $validated['idempotency_key'],
+                'penalty_policy_acknowledged' => $request->boolean('penalty_policy_acknowledged'),
             ]);
         } catch (CreditLimitExceeded $exception) {
             return back()->withInput()->withErrors(['amount' => $exception->getMessage()]);
@@ -99,6 +103,7 @@ class CreditController extends Controller
     public function confirmation(LedgerEntry $ledgerEntry): View
     {
         Gate::authorize('view', $ledgerEntry);
+        abort_if($ledgerEntry->isLatePenalty(), 404);
 
         return view('credits.confirmation', [
             'ledgerEntry' => $ledgerEntry,

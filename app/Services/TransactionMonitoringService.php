@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
@@ -26,7 +27,16 @@ class TransactionMonitoringService
     /** Suki Points redeemed as store credit: reduces debt but is not cash received. */
     public const TYPE_REDEMPTION = 'loyalty_redemption';
 
-    public const TYPES = [self::TYPE_CREDIT, self::TYPE_PAYMENT, self::TYPE_REDEMPTION];
+    /** A late payment fee charged on an overdue credit (adds to debt). */
+    public const TYPE_PENALTY = 'late_penalty';
+
+    /** An owner waiving a late fee: reduces debt but is not cash received. */
+    public const TYPE_WAIVER = 'penalty_waiver';
+
+    public const TYPES = [self::TYPE_CREDIT, self::TYPE_PAYMENT, self::TYPE_REDEMPTION, self::TYPE_PENALTY, self::TYPE_WAIVER];
+
+    /** Types that add to what the customer owes and have a remaining amount. */
+    private const DEBT_TYPES = [self::TYPE_CREDIT, self::TYPE_PENALTY];
 
     /**
      * Allowed sort keys mapped to their columns.
@@ -67,11 +77,11 @@ class TransactionMonitoringService
 
         $transactions->getCollection()->transform(function (object $transaction) use ($today): object {
             $transaction->amount = Money::fromCents(Money::sumToCents($transaction->amount));
-            $transaction->remaining_amount = $transaction->transaction_type === self::TYPE_CREDIT
+            $transaction->remaining_amount = in_array($transaction->transaction_type, self::DEBT_TYPES, true)
                 ? Money::fromCents(Money::sumToCents($transaction->remaining_amount))
                 : null;
             $transaction->status = match (true) {
-                $transaction->transaction_type !== self::TYPE_CREDIT => null,
+                ! in_array($transaction->transaction_type, self::DEBT_TYPES, true) => null,
                 $transaction->remaining_amount === '0.00' => 'Paid',
                 $transaction->repayment_deadline !== null
                     && substr((string) $transaction->repayment_deadline, 0, 10) < $today => 'Overdue',
@@ -113,23 +123,21 @@ class TransactionMonitoringService
     {
         $type = $filters['type'] ?? null;
 
-        if ($type === self::TYPE_CREDIT) {
-            return $this->credits($filters);
+        if ($type !== null) {
+            return in_array($type, self::DEBT_TYPES, true) ? $this->credits($filters, $type) : $this->payments($filters, $type);
         }
 
-        if ($type === self::TYPE_PAYMENT || $type === self::TYPE_REDEMPTION) {
-            return $this->payments($filters, $type);
-        }
-
-        return $this->credits($filters)
+        return $this->credits($filters, self::TYPE_CREDIT)
+            ->unionAll($this->credits($filters, self::TYPE_PENALTY))
             ->unionAll($this->payments($filters, self::TYPE_PAYMENT))
-            ->unionAll($this->payments($filters, self::TYPE_REDEMPTION));
+            ->unionAll($this->payments($filters, self::TYPE_REDEMPTION))
+            ->unionAll($this->payments($filters, self::TYPE_WAIVER));
     }
 
     /**
      * @param  array{from?: string|null, to?: string|null, store_id?: int|string|null, customer?: string|null}  $filters
      */
-    private function credits(array $filters): Builder
+    private function credits(array $filters, string $type): Builder
     {
         $paymentsByEntry = DB::table('payments')
             ->select('ledger_entry_id')
@@ -140,7 +148,8 @@ class TransactionMonitoringService
             ->join('customers', 'customers.id', '=', 'ledger_entries.customer_id')
             ->join('stores', 'stores.id', '=', 'customers.store_id')
             ->leftJoinSub($paymentsByEntry, 'payments_by_entry', 'payments_by_entry.ledger_entry_id', '=', 'ledger_entries.id')
-            ->selectRaw('? AS transaction_type', [self::TYPE_CREDIT])
+            ->where('ledger_entries.kind', $type === self::TYPE_PENALTY ? LedgerEntry::KIND_LATE_PENALTY : LedgerEntry::KIND_CREDIT)
+            ->selectRaw('? AS transaction_type', [$type])
             ->selectRaw('ledger_entries.id AS reference_id')
             ->selectRaw('ledger_entries.transaction_date AS transaction_date')
             ->selectRaw('ledger_entries.created_at AS recorded_at')
@@ -166,7 +175,11 @@ class TransactionMonitoringService
         $payments = DB::table('payments')
             ->join('customers', 'customers.id', '=', 'payments.customer_id')
             ->join('stores', 'stores.id', '=', 'customers.store_id')
-            ->where('payments.kind', $type === self::TYPE_REDEMPTION ? Payment::KIND_LOYALTY_REDEMPTION : Payment::KIND_CASH)
+            ->where('payments.kind', match ($type) {
+                self::TYPE_REDEMPTION => Payment::KIND_LOYALTY_REDEMPTION,
+                self::TYPE_WAIVER => Payment::KIND_PENALTY_WAIVER,
+                default => Payment::KIND_CASH,
+            })
             ->selectRaw('? AS transaction_type', [$type])
             ->selectRaw('MIN(payments.id) AS reference_id')
             ->selectRaw('MAX(payments.payment_date) AS transaction_date')

@@ -99,7 +99,7 @@
 
         @include('customers.partials.suki-points')
 
-        @include('customers.partials.ledger-history')
+        @include('customers.partials.ledger-history', ['canManagePenalties' => true])
     </main>
 </body>
 </html>

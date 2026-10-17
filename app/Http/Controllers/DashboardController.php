@@ -51,7 +51,7 @@ class DashboardController extends Controller
             ->get()
             ->map(fn (LedgerEntry $entry): array => [
                 'id' => 'credit-'.$entry->id,
-                'type' => 'Credit recorded',
+                'type' => $entry->isLatePenalty() ? 'Late payment fee' : 'Credit recorded',
                 'customer_name' => $entry->customer?->full_name ?? 'Unknown customer',
                 'amount' => $entry->amount,
                 'created_at' => $entry->created_at,
@@ -73,7 +73,11 @@ class DashboardController extends Controller
             ->get()
             ->map(fn (object $payment): array => [
                 'id' => 'payment-'.$payment->payment_batch_id,
-                'type' => $payment->kind === Payment::KIND_LOYALTY_REDEMPTION ? 'Suki Points redeemed' : 'Payment received',
+                'type' => match ($payment->kind) {
+                    Payment::KIND_LOYALTY_REDEMPTION => 'Suki Points redeemed',
+                    Payment::KIND_PENALTY_WAIVER => 'Late payment fee waived',
+                    default => 'Payment received',
+                },
                 'customer_name' => $payment->full_name,
                 'amount' => Money::fromCents(Money::toCents((string) $payment->amount)),
                 'created_at' => Carbon::parse($payment->created_at),
@@ -116,9 +120,16 @@ class DashboardController extends Controller
             })
             ->values();
 
+        $recentPenaltyCount = LedgerEntry::query()
+            ->where('kind', LedgerEntry::KIND_LATE_PENALTY)
+            ->whereRelation('customer', 'store_id', $storeId)
+            ->where('transaction_date', '>=', now()->subDays(6)->toDateString())
+            ->count();
+
         return view('dashboard', [
             'totalCollectibles' => Money::fromCents(Money::toCents((string) ($totalOutstanding ?? '0'))),
             'overdueAccountCount' => $overdueAccountCount,
+            'recentPenaltyCount' => $recentPenaltyCount,
             'recentActivity' => $recentActivity,
             'storeIsSuspended' => ! $request->user()->store->isActive(),
         ]);

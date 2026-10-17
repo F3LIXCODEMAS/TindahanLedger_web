@@ -14,3 +14,10 @@ Schedule::command('reminders:send-due')
     ->withoutOverlapping(60)
     ->onOneServer()
     ->description('Send scheduled repayment reminders');
+
+Schedule::command('penalties:apply-due')
+    ->dailyAt('00:30')
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping(60)
+    ->onOneServer()
+    ->description('Apply late payment fees to credits past their grace period');

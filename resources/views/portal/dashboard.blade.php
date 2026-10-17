@@ -19,6 +19,9 @@
     <section class="portal-card portal-balance" aria-labelledby="portal-balance-title">
         <h2 id="portal-balance-title">Current balance</h2>
         <p class="portal-balance-value">₱{{ $ledger['outstanding_balance'] }}</p>
+        @if ($ledger['penalty_outstanding'] !== '0.00')
+            <p class="portal-muted">Includes late payment fees of ₱{{ $ledger['penalty_outstanding'] }} (credits ₱{{ $ledger['principal_outstanding'] }}).</p>
+        @endif
 
         @if ($ledger['outstanding_balance'] === '0.00')
             <p class="portal-status is-good">Fully paid. You have no outstanding balance.</p>
@@ -64,7 +67,7 @@
                 @foreach ($transactions as $transaction)
                     <li>
                         <div>
-                            <strong>{{ match ($transaction['type']) { 'credit' => 'Credit', 'loyalty_redemption' => 'Suki Points redeemed', default => 'Payment' } }}</strong>
+                            <strong>{{ match ($transaction['type']) { 'credit' => 'Credit', 'loyalty_redemption' => 'Suki Points redeemed', 'late_penalty' => 'Late payment fee', 'penalty_waiver' => 'Late fee waived', default => 'Payment' } }}</strong>
                             <span class="portal-muted">{{ $transaction['date']->format('M j, Y') }}</span>
                             @if ($transaction['items'] !== [])
                                 <span class="portal-muted">{{ implode(', ', $transaction['items']) }}</span>
@@ -91,7 +94,8 @@
                             @endif
                         </div>
                         <div class="portal-amount">
-                            <span class="{{ $transaction['type'] !== 'credit' ? 'is-payment' : '' }}">{{ $transaction['type'] !== 'credit' ? '−' : '+' }}₱{{ $transaction['amount'] }}</span>
+                            @php($addsToDebt = in_array($transaction['type'], \App\Services\CustomerLedgerService::DEBT_TYPES, true))
+                            <span class="{{ $addsToDebt ? '' : 'is-payment' }}">{{ $addsToDebt ? '+' : '−' }}₱{{ $transaction['amount'] }}</span>
                             <span class="portal-muted">Balance ₱{{ $transaction['running_balance'] }}</span>
                         </div>
                     </li>

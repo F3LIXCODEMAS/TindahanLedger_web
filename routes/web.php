@@ -16,6 +16,8 @@ use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerAccessCodeController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LatePenaltyPolicyController;
+use App\Http\Controllers\LatePenaltyWaiverController;
 use App\Http\Controllers\OverdueAccountController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Portal\CustomerPortalController;
@@ -81,6 +83,10 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
 
     Route::get('/settings/email-notifications', [StoreEmailSettingsController::class, 'edit'])
         ->name('email-settings.edit');
+    Route::get('/settings/late-penalties', [LatePenaltyPolicyController::class, 'edit'])
+        ->name('late-penalties.edit');
+    Route::put('/settings/late-penalties', [LatePenaltyPolicyController::class, 'update'])
+        ->name('late-penalties.update');
     Route::put('/settings/email-notifications', [StoreEmailSettingsController::class, 'update'])
         ->name('email-settings.update');
     Route::post('/settings/email-notifications/test', [StoreEmailSettingsController::class, 'test'])
@@ -114,6 +120,9 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
 
         Route::post('/customers/{customer}/suki-points/redemptions', [SukiPointRedemptionController::class, 'store'])
             ->name('customers.suki-redemptions.store');
+
+        Route::post('/customers/{customer}/late-penalties/{ledgerEntry}/waiver', [LatePenaltyWaiverController::class, 'store'])
+            ->name('customers.late-penalties.waive');
     });
 
     Route::middleware('private.headers')->group(function () {

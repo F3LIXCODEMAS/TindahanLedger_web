@@ -115,6 +115,30 @@
                                                 <dt>Days overdue</dt>
                                                 <dd>{{ $entry->days_overdue }} {{ $entry->days_overdue === 1 ? 'day' : 'days' }}</dd>
                                             </div>
+                                            @php($penalty = $entry->penalty_status)
+                                            @if ($penalty['state'] !== \App\Services\LatePenaltyService::STATE_NOT_COVERED)
+                                                <div>
+                                                    <dt>Late fee</dt>
+                                                    <dd>
+                                                        @switch($penalty['state'])
+                                                            @case(\App\Services\LatePenaltyService::STATE_IN_GRACE)
+                                                                In grace period until {{ $penalty['grace_ends_on']->format('M j') }} (₱{{ $penalty['fee'] }} after)
+                                                                @break
+                                                            @case(\App\Services\LatePenaltyService::STATE_ELIGIBLE)
+                                                                Due: ₱{{ $penalty['fee'] }} at the next daily run
+                                                                @break
+                                                            @case(\App\Services\LatePenaltyService::STATE_APPLIED)
+                                                                ₱{{ $penalty['penalty']->amount }} applied {{ $penalty['penalty']->transaction_date->format('M j, Y') }}
+                                                                @break
+                                                            @case(\App\Services\LatePenaltyService::STATE_WAIVED)
+                                                                Applied, then waived
+                                                                @break
+                                                            @default
+                                                                None
+                                                        @endswitch
+                                                    </dd>
+                                                </div>
+                                            @endif
                                         </dl>
 
                                         <div class="overdue-reminders">

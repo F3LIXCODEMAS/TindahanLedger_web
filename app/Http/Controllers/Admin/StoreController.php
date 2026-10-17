@@ -167,7 +167,7 @@ class StoreController extends Controller
             ->limit(10)
             ->get()
             ->map(fn (LedgerEntry $entry): array => [
-                'type' => 'Credit',
+                'type' => $entry->isLatePenalty() ? 'Late payment fee' : 'Credit',
                 'customer_name' => $entry->customer->full_name,
                 'amount' => $entry->amount,
                 'occurred_at' => $entry->created_at,
@@ -182,7 +182,11 @@ class StoreController extends Controller
             ->get()
             ->groupBy(fn (Payment $payment): string => $payment->payment_batch_id ?? 'payment-'.$payment->id)
             ->map(fn (Collection $allocations): array => [
-                'type' => $allocations->first()->isLoyaltyRedemption() ? 'Suki Points redeemed' : 'Payment',
+                'type' => match ($allocations->first()->kind) {
+                    Payment::KIND_LOYALTY_REDEMPTION => 'Suki Points redeemed',
+                    Payment::KIND_PENALTY_WAIVER => 'Late fee waived',
+                    default => 'Payment',
+                },
                 'customer_name' => $allocations->first()->customer->full_name,
                 'amount' => Money::fromCents($allocations->sum(fn (Payment $payment): int => Money::toCents($payment->amount))),
                 'occurred_at' => $allocations->max('created_at'),

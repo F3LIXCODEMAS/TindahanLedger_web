@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Models\SukiPoint;
 use App\Support\Money;
@@ -10,7 +11,17 @@ use Illuminate\Support\Collection;
 
 class CustomerLedgerService
 {
-    public function __construct(private LedgerService $ledgerService) {}
+    /**
+     * Transaction types that add to what the customer owes.
+     *
+     * @var list<string>
+     */
+    public const DEBT_TYPES = ['credit', 'late_penalty'];
+
+    public function __construct(
+        private LedgerService $ledgerService,
+        private LatePenaltyService $latePenaltyService,
+    ) {}
 
     /**
      * @return array{
@@ -58,13 +69,17 @@ class CustomerLedgerService
 
         $financialSummary = $this->ledgerService->financialSummary($customer);
         $overdueEntryCount = 0;
+        $principalOutstandingInCents = 0;
+        $penaltyOutstandingInCents = 0;
         $events = [];
+        $penaltiesByCredit = $credits->filter(fn (LedgerEntry $entry): bool => $entry->isLatePenalty())->keyBy('penalty_for_entry_id');
 
         foreach ($credits as $entry) {
             $remainingAmountInCents = max(
                 0,
                 Money::toCents($entry->amount) - ($paidAmountsByEntry[$entry->id] ?? 0),
             );
+            $isPenalty = $entry->isLatePenalty();
             $isOverdue = $remainingAmountInCents > 0
                 && $entry->repayment_deadline !== null
                 && $entry->repayment_deadline->lt(today());
@@ -73,12 +88,29 @@ class CustomerLedgerService
                 $overdueEntryCount++;
             }
 
+            if ($isPenalty) {
+                $penaltyOutstandingInCents += $remainingAmountInCents;
+            } else {
+                $principalOutstandingInCents += $remainingAmountInCents;
+            }
+
+            $penaltyStatus = $isPenalty ? null : $this->latePenaltyService->statusFor(
+                $entry,
+                $remainingAmountInCents,
+                $penaltiesByCredit->get($entry->id),
+            );
+
             $events[] = [
-                'id' => 'credit-'.$entry->id,
+                'id' => ($isPenalty ? 'penalty-' : 'credit-').$entry->id,
                 'record_id' => $entry->id,
-                'type' => 'credit',
+                'type' => $isPenalty ? 'late_penalty' : 'credit',
                 'type_order' => 0,
                 'points_redeemed' => null,
+                'penalty_status' => $penaltyStatus,
+                'penalty_entry_id' => $isPenalty ? $entry->id : null,
+                'penalty_waived_at' => $isPenalty ? $entry->penalty_waived_at : null,
+                'penalty_waiver_reason' => $isPenalty ? $entry->penalty_waiver_reason : null,
+                'can_waive' => $isPenalty && $entry->penalty_waived_at === null && $remainingAmountInCents > 0,
                 'date' => $entry->transaction_date,
                 'recorded_at' => $entry->created_at,
                 'amount_in_cents' => Money::toCents($entry->amount),
@@ -109,9 +141,18 @@ class CustomerLedgerService
                     ? 'payment-'.$firstPayment->payment_batch_id
                     : 'payment-'.$firstPayment->id,
                 'record_id' => $lastPayment->id,
-                'type' => $isRedemption ? 'loyalty_redemption' : 'payment',
+                'type' => match ($firstPayment->kind) {
+                    Payment::KIND_LOYALTY_REDEMPTION => 'loyalty_redemption',
+                    Payment::KIND_PENALTY_WAIVER => 'penalty_waiver',
+                    default => 'payment',
+                },
                 'type_order' => 1,
                 'points_redeemed' => $isRedemption ? ($firstPayment->sukiPointTransaction?->points_redeemed ?? 0) : null,
+                'penalty_status' => null,
+                'penalty_entry_id' => null,
+                'penalty_waived_at' => null,
+                'penalty_waiver_reason' => null,
+                'can_waive' => false,
                 'date' => $firstPayment->payment_date,
                 'recorded_at' => $lastPayment->created_at,
                 'amount_in_cents' => $paymentGroup->sum(
@@ -150,7 +191,7 @@ class CustomerLedgerService
 
         $runningBalanceInCents = 0;
         $transactions = $transactions->map(function (array $event) use (&$runningBalanceInCents): array {
-            $runningBalanceInCents += $event['type'] === 'credit'
+            $runningBalanceInCents += in_array($event['type'], self::DEBT_TYPES, true)
                 ? $event['amount_in_cents']
                 : -$event['amount_in_cents'];
 
@@ -164,9 +205,16 @@ class CustomerLedgerService
                 'description' => match ($event['type']) {
                     'payment' => 'Cash payment',
                     'loyalty_redemption' => 'Suki Points redeemed as store credit',
+                    'late_penalty' => 'Late payment fee',
+                    'penalty_waiver' => 'Late payment fee waived (not cash)',
                     default => null,
                 },
                 'points_redeemed' => $event['points_redeemed'],
+                'penalty_status' => $event['penalty_status'],
+                'penalty_entry_id' => $event['penalty_entry_id'],
+                'penalty_waived_at' => $event['penalty_waived_at'],
+                'penalty_waiver_reason' => $event['penalty_waiver_reason'],
+                'can_waive' => $event['can_waive'],
                 'items' => $event['items'],
                 'deadline' => $event['deadline'],
                 'remaining_amount' => $event['remaining_amount_in_cents'] === null
@@ -185,6 +233,8 @@ class CustomerLedgerService
 
         return [
             'outstanding_balance' => $financialSummary['outstanding_balance'],
+            'principal_outstanding' => Money::fromCents($principalOutstandingInCents),
+            'penalty_outstanding' => Money::fromCents($penaltyOutstandingInCents),
             'available_credit' => $financialSummary['available_credit'],
             'is_overdue' => $overdueEntryCount > 0,
             'overdue_entry_count' => $overdueEntryCount,

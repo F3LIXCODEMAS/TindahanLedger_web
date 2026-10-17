@@ -11,10 +11,12 @@ use App\Models\DebtCycleCompletion;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Models\Store;
+use App\Models\StorePenaltyPolicy;
 use App\Models\SukiPoint;
 use App\Models\SukiPointTransaction;
 use App\Models\User;
 use App\Support\Money;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,7 +24,13 @@ use Illuminate\Support\Str;
 class LedgerService
 {
     /**
-     * @param  array{amount: float|int|string, itemized_list?: array<int, mixed>|null, note?: string|null, transaction_date?: string, repayment_deadline?: string|null, idempotency_key?: string|null}  $attributes
+     * A credit with a repayment deadline falls under the store's late payment
+     * policy only when that policy is active and the owner confirmed the
+     * customer was told about it (`penalty_policy_acknowledged`). The policy
+     * values are copied onto the credit, so later policy changes never
+     * affect it.
+     *
+     * @param  array{amount: float|int|string, itemized_list?: array<int, mixed>|null, note?: string|null, transaction_date?: string, repayment_deadline?: string|null, idempotency_key?: string|null, penalty_policy_acknowledged?: bool}  $attributes
      */
     public function recordCredit(Customer $customer, array $attributes): LedgerEntry
     {
@@ -65,6 +73,7 @@ class LedgerService
                 'note' => $attributes['note'] ?? null,
                 'transaction_date' => $attributes['transaction_date'] ?? now()->toDateString(),
                 'repayment_deadline' => $attributes['repayment_deadline'] ?? null,
+                'penalty_policy_snapshot' => $this->penaltyPolicySnapshot($lockedCustomer, $attributes),
                 'running_balance' => Money::fromCents($projectedBalanceInCents),
                 'idempotency_key' => $attributes['idempotency_key'] ?? null,
             ]);
@@ -433,6 +442,22 @@ class LedgerService
         }
 
         return $payment;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, int|string>|null
+     */
+    private function penaltyPolicySnapshot(Customer $customer, array $attributes): ?array
+    {
+        if (empty($attributes['repayment_deadline']) || ($attributes['penalty_policy_acknowledged'] ?? false) !== true) {
+            return null;
+        }
+
+        $policy = StorePenaltyPolicy::query()->where('store_id', $customer->store_id)->first();
+        $today = CarbonImmutable::now((string) config('app.timezone'))->startOfDay();
+
+        return $policy?->appliesOn($today) ? $policy->snapshot() : null;
     }
 
     public function outstandingBalanceInCents(Customer $customer): int

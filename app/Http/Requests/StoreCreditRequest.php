@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\LatePenaltyService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,28 @@ class StoreCreditRequest extends FormRequest
             'note' => ['nullable', 'string', 'max:500'],
             'repayment_deadline' => ['nullable', 'date_format:Y-m-d'],
             'idempotency_key' => ['required', 'uuid'],
+            'penalty_policy_acknowledged' => $this->filled('repayment_deadline') && $this->latePenaltyPolicyApplies()
+                ? ['accepted']
+                : ['nullable'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'penalty_policy_acknowledged.required' => 'Confirm that the customer was told about the late payment policy.',
+            'penalty_policy_acknowledged.accepted' => 'Confirm that the customer was told about the late payment policy.',
+        ];
+    }
+
+    private function latePenaltyPolicyApplies(): bool
+    {
+        $store = $this->user()?->store;
+
+        return $store !== null && app(LatePenaltyService::class)->activePolicyFor($store) !== null;
     }
 
     protected function prepareForValidation(): void
