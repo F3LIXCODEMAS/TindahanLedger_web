@@ -117,6 +117,27 @@
                         <p class="field-error" id="deadline-error" role="alert" @if (!$errors->has('repayment_deadline')) hidden @endif>@error('repayment_deadline'){{ $message }}@enderror</p>
                     </div>
 
+                    @if ($penaltyPolicy)
+                        <div class="penalty-disclosure" data-penalty-disclosure>
+                            <p class="eyebrow">LATE PAYMENT POLICY</p>
+                            <p>
+                                If a deadline is set and part of this credit is still unpaid after the deadline plus
+                                <strong>{{ $penaltyPolicy->grace_days }} grace {{ $penaltyPolicy->grace_days === 1 ? 'day' : 'days' }}</strong>,
+                                a one-time late fee of <strong>₱{{ $penaltyPolicy->fee() }}</strong> is added to the customer's balance.
+                                It appears in the ledger as a separate "Late payment fee" line. The store may waive it.
+                            </p>
+                            @if ($penaltyPolicy->disclosure_text)
+                                <p>{{ $penaltyPolicy->disclosure_text }}</p>
+                            @endif
+                            <label class="penalty-acknowledge">
+                                <input type="checkbox" name="penalty_policy_acknowledged" value="1" @checked(old('penalty_policy_acknowledged')) aria-describedby="penalty-ack-error">
+                                I told the customer about this late payment policy.
+                            </label>
+                            <p class="password-requirements">Required only when a repayment deadline is set. Credits without a deadline are never charged a late fee.</p>
+                            <p class="field-error" id="penalty-ack-error" role="alert" @if (!$errors->has('penalty_policy_acknowledged')) hidden @endif>@error('penalty_policy_acknowledged'){{ $message }}@enderror</p>
+                        </div>
+                    @endif
+
                     <div class="customer-form-actions credit-form-actions">
                         <a class="customer-cancel-link" href="{{ $selectedCustomerId ? route('customers.show', $selectedCustomerId) : route('customers.index') }}">Cancel</a>
                         <button class="login-submit" type="submit" data-credit-submit>

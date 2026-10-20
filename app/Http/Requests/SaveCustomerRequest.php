@@ -5,15 +5,23 @@ namespace App\Http\Requests;
 use App\Models\Customer;
 use App\Support\Money;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SaveCustomerRequest extends FormRequest
 {
+    /**
+     * Editing another store's customer responds as not found (404).
+     */
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        if ($customer = $this->customerBeingUpdated()) {
+            Gate::authorize('update', $customer);
+        }
+
+        return $this->ownerStoreId() !== null;
     }
 
     protected function prepareForValidation(): void
@@ -33,7 +41,7 @@ class SaveCustomerRequest extends FormRequest
 
     public function rules(): array
     {
-        $emailRule = Rule::unique('customers', 'email');
+        $emailRule = Rule::unique('customers', 'email')->where('store_id', $this->ownerStoreId());
 
         if ($customer = $this->customerBeingUpdated()) {
             $emailRule->ignore($customer);
@@ -93,6 +101,7 @@ class SaveCustomerRequest extends FormRequest
         }
 
         $duplicateExists = Customer::query()
+            ->where('store_id', $this->ownerStoreId())
             ->whereIn('contact_number', $contactNumbers)
             ->when($customer, fn ($query) => $query->where('id', '!=', $customer->getKey()))
             ->get(['id', 'full_name'])
@@ -122,6 +131,11 @@ class SaveCustomerRequest extends FormRequest
                 'The credit limit cannot be lower than the customer’s current outstanding balance.',
             );
         }
+    }
+
+    private function ownerStoreId(): ?int
+    {
+        return $this->user()?->store?->getKey();
     }
 
     private function customerBeingUpdated(): ?Customer

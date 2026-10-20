@@ -34,8 +34,19 @@ class PasswordController extends Controller
             'password.different' => 'Choose a password different from your current one.',
         ]);
 
-        $request->user()->update(['password' => $validated['password']]);
+        $user = $request->user();
+        $wasTemporaryPassword = $user->must_change_password;
+
+        $user->forceFill([
+            'password' => $validated['password'],
+            'must_change_password' => false,
+        ])->save();
         $request->session()->regenerate();
+
+        if ($wasTemporaryPassword) {
+            return redirect()->route($user->isSuperAdmin() ? 'admin.dashboard' : 'dashboard')
+                ->with('status', 'Your password has been updated.');
+        }
 
         return redirect()->route('password.edit')->with('status', 'Your password has been updated.');
     }

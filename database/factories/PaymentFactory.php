@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -20,8 +19,10 @@ class PaymentFactory extends Factory
     public function definition(): array
     {
         return [
-            'customer_id' => Customer::factory(),
             'ledger_entry_id' => LedgerEntry::factory(),
+            'customer_id' => fn (array $attributes): int => LedgerEntry::query()
+                ->whereKey($attributes['ledger_entry_id'])
+                ->value('customer_id'),
             'amount' => fake()->randomFloat(2, 10, 500),
             'payment_date' => fake()->dateTimeBetween('-30 days', 'today')->format('Y-m-d'),
         ];

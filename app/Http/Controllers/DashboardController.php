@@ -2,49 +2,38 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Services\FinancialSummaryService;
 use App\Support\Money;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    /**
+     * "Outstanding principal" keeps the original meaning of the former Total
+     * collectibles KPI (unpaid credit only); late fees and the total amount
+     * due are shown as separate figures from FinancialSummaryService.
+     */
+    public function __invoke(Request $request, FinancialSummaryService $financialSummaryService): View
     {
-        $paymentsByEntry = DB::table('payments')
-            ->select('ledger_entry_id')
-            ->selectRaw('SUM(amount) AS total_paid')
-            ->groupBy('ledger_entry_id');
-
-        $totalOutstanding = DB::table('ledger_entries')
-            ->leftJoinSub($paymentsByEntry, 'payments_by_entry', function ($join): void {
-                $join->on('payments_by_entry.ledger_entry_id', '=', 'ledger_entries.id');
-            })
-            ->selectRaw('COALESCE(SUM(CASE WHEN ledger_entries.amount > COALESCE(payments_by_entry.total_paid, 0) THEN ledger_entries.amount - COALESCE(payments_by_entry.total_paid, 0) ELSE 0 END), 0) AS total_outstanding')
-            ->value('total_outstanding');
-
-        $today = now()->toDateString();
-
-        $overdueAccountCount = Customer::query()
-            ->whereHas('ledgerEntries', function (Builder $query) use ($today): void {
-                $query->where('repayment_deadline', '<', $today)
-                    ->whereRaw('ledger_entries.amount > COALESCE((SELECT SUM(payments.amount) FROM payments WHERE payments.ledger_entry_id = ledger_entries.id), 0)');
-            })
-            ->count();
+        $store = $request->user()->store;
+        $storeId = $store->getKey();
+        $storeSummary = $financialSummaryService->forStore($store);
 
         $recentCredits = LedgerEntry::query()
             ->with('customer')
+            ->whereRelation('customer', 'store_id', $storeId)
             ->latest('created_at')
             ->latest('id')
             ->limit(8)
             ->get()
             ->map(fn (LedgerEntry $entry): array => [
                 'id' => 'credit-'.$entry->id,
-                'type' => 'Credit recorded',
+                'type' => $entry->isLatePenalty() ? 'Late payment fee' : 'Credit recorded',
                 'customer_name' => $entry->customer?->full_name ?? 'Unknown customer',
                 'amount' => $entry->amount,
                 'created_at' => $entry->created_at,
@@ -53,19 +42,24 @@ class DashboardController extends Controller
 
         $recentBatchedPayments = DB::table('payments')
             ->join('customers', 'customers.id', '=', 'payments.customer_id')
-            ->select('payments.payment_batch_id', 'payments.customer_id', 'customers.full_name')
+            ->select('payments.payment_batch_id', 'payments.customer_id', 'payments.kind', 'customers.full_name')
             ->selectRaw('SUM(payments.amount) AS amount')
             ->selectRaw('MAX(payments.created_at) AS created_at')
             ->selectRaw('MAX(payments.id) AS id')
+            ->where('customers.store_id', $storeId)
             ->whereNotNull('payments.payment_batch_id')
-            ->groupBy('payments.payment_batch_id', 'payments.customer_id', 'customers.full_name')
+            ->groupBy('payments.payment_batch_id', 'payments.customer_id', 'payments.kind', 'customers.full_name')
             ->orderByDesc(DB::raw('MAX(payments.created_at)'))
             ->orderByDesc(DB::raw('MAX(payments.id)'))
             ->limit(8)
             ->get()
             ->map(fn (object $payment): array => [
                 'id' => 'payment-'.$payment->payment_batch_id,
-                'type' => 'Payment received',
+                'type' => match ($payment->kind) {
+                    Payment::KIND_LOYALTY_REDEMPTION => 'Suki Points redeemed',
+                    Payment::KIND_PENALTY_WAIVER => 'Late payment fee waived',
+                    default => 'Payment received',
+                },
                 'customer_name' => $payment->full_name,
                 'amount' => Money::fromCents(Money::toCents((string) $payment->amount)),
                 'created_at' => Carbon::parse($payment->created_at),
@@ -74,6 +68,7 @@ class DashboardController extends Controller
 
         $recentLegacyPayments = Payment::query()
             ->with('customer')
+            ->whereRelation('customer', 'store_id', $storeId)
             ->whereNull('payment_batch_id')
             ->latest('created_at')
             ->latest('id')
@@ -107,10 +102,22 @@ class DashboardController extends Controller
             })
             ->values();
 
+        $recentPenaltyCount = LedgerEntry::query()
+            ->where('kind', LedgerEntry::KIND_LATE_PENALTY)
+            ->whereRelation('customer', 'store_id', $storeId)
+            ->where('transaction_date', '>=', now()->subDays(6)->toDateString())
+            ->count();
+
         return view('dashboard', [
-            'totalCollectibles' => Money::fromCents(Money::toCents((string) ($totalOutstanding ?? '0'))),
-            'overdueAccountCount' => $overdueAccountCount,
+            'outstandingPrincipal' => $storeSummary['totals']['principal_outstanding'],
+            'outstandingPenalties' => $storeSummary['totals']['penalties_outstanding'],
+            'totalAmountDue' => $storeSummary['totals']['total_due'],
+            'overdueAccountCount' => $storeSummary['overdue_account_count'],
+            'customersWithOutstandingPenalties' => $storeSummary['customers_with_outstanding_penalties'],
+            'overdueCreditPenaltyStates' => $storeSummary['overdue_credit_penalty_states'],
+            'recentPenaltyCount' => $recentPenaltyCount,
             'recentActivity' => $recentActivity,
+            'storeIsSuspended' => ! $request->user()->store->isActive(),
         ]);
     }
 }

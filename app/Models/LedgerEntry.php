@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Support\Money;
 use Database\Factories\LedgerEntryFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property string $running_balance Customer balance immediately after this credit was recorded; later payments do not change this snapshot.
@@ -18,6 +20,19 @@ class LedgerEntry extends Model
     /** @use HasFactory<LedgerEntryFactory> */
     use HasFactory;
 
+    public const KIND_CREDIT = 'credit';
+
+    /**
+     * A one-time late payment fee charged on an overdue credit. It is owed
+     * like any debt but has no deadline, so it is never penalised itself.
+     */
+    public const KIND_LATE_PENALTY = 'late_penalty';
+
+    /**
+     * `kind` and `penalty_for_entry_id` are set only by LatePenaltyService.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'customer_id',
         'amount',
@@ -25,8 +40,16 @@ class LedgerEntry extends Model
         'note',
         'transaction_date',
         'repayment_deadline',
+        'penalty_policy_snapshot',
         'running_balance',
         'idempotency_key',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'kind' => self::KIND_CREDIT,
     ];
 
     protected function casts(): array
@@ -36,8 +59,35 @@ class LedgerEntry extends Model
             'itemized_list' => 'array',
             'transaction_date' => 'date',
             'repayment_deadline' => 'date',
+            'penalty_policy_snapshot' => 'array',
+            'penalty_waived_at' => 'datetime',
             'running_balance' => 'decimal:2',
         ];
+    }
+
+    public function isLatePenalty(): bool
+    {
+        return $this->kind === self::KIND_LATE_PENALTY;
+    }
+
+    /**
+     * @param  Builder<LedgerEntry>  $query
+     */
+    public function scopeCredits(Builder $query): void
+    {
+        $query->where('kind', self::KIND_CREDIT);
+    }
+
+    /** The late penalty charged on this credit, if any. */
+    public function latePenalty(): HasOne
+    {
+        return $this->hasOne(self::class, 'penalty_for_entry_id');
+    }
+
+    /** The credit this penalty was charged on. */
+    public function penaltyFor(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'penalty_for_entry_id');
     }
 
     public function customer(): BelongsTo

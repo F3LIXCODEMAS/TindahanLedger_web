@@ -3,25 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\CreditLimitExceeded;
+use App\Exceptions\StoreSuspended;
 use App\Http\Requests\StoreCreditRequest;
 use App\Mail\CreditEntryReceipt;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\User;
+use App\Services\LatePenaltyService;
 use App\Services\LedgerService;
 use App\Services\MailDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
 class CreditController extends Controller
 {
-    public function create(Request $request, LedgerService $ledgerService): View
+    public function create(Request $request, LedgerService $ledgerService, LatePenaltyService $latePenaltyService): View
     {
-        $customers = Customer::query()
+        $penaltyPolicy = $latePenaltyService->activePolicyFor($request->user()->store);
+        $customers = $request->user()->store->customers()
             ->orderBy('full_name')
             ->orderBy('id')
             ->get(['id', 'full_name', 'contact_number', 'credit_limit']);
@@ -37,11 +41,14 @@ class CreditController extends Controller
                 ? $ledgerService->financialSummary($selectedCustomer)
                 : null,
             'idempotencyKey' => Str::uuid()->toString(),
+            'penaltyPolicy' => $penaltyPolicy,
         ]);
     }
 
     public function customerSummary(Customer $customer, LedgerService $ledgerService): JsonResponse
     {
+        Gate::authorize('view', $customer);
+
         return response()->json($ledgerService->financialSummary($customer));
     }
 
@@ -53,7 +60,7 @@ class CreditController extends Controller
         $validated = $request->validated();
 
         try {
-            $customer = Customer::query()->findOrFail($validated['customer_id']);
+            $customer = $request->user()->store->customers()->findOrFail($validated['customer_id']);
             $itemizedText = $validated['itemized_list'] ?? null;
             $itemizedList = $itemizedText === null
                 ? null
@@ -64,9 +71,12 @@ class CreditController extends Controller
                 'note' => $validated['note'] ?? null,
                 'repayment_deadline' => $validated['repayment_deadline'] ?? null,
                 'idempotency_key' => $validated['idempotency_key'],
+                'penalty_policy_acknowledged' => $request->boolean('penalty_policy_acknowledged'),
             ]);
         } catch (CreditLimitExceeded $exception) {
             return back()->withInput()->withErrors(['amount' => $exception->getMessage()]);
+        } catch (StoreSuspended $exception) {
+            return redirect()->route('dashboard')->withErrors(['store' => $exception->getMessage()]);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -92,6 +102,9 @@ class CreditController extends Controller
 
     public function confirmation(LedgerEntry $ledgerEntry): View
     {
+        Gate::authorize('view', $ledgerEntry);
+        abort_if($ledgerEntry->isLatePenalty(), 404);
+
         return view('credits.confirmation', [
             'ledgerEntry' => $ledgerEntry,
             'customer' => $ledgerEntry->customer,

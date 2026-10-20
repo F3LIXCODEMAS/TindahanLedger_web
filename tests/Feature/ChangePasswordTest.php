@@ -20,7 +20,7 @@ it('shows the change-password form to the authenticated owner', function () {
 });
 
 it('rejects an incorrect current password without changing the saved password', function () {
-    $owner = User::factory()->create(['password' => 'Current-owner-pass1']);
+    $owner = User::factory()->withStore()->create(['password' => 'Current-owner-pass1']);
 
     $this->actingAs($owner)->put(route('password.update'), [
         'current_password' => 'incorrect-password',
@@ -32,7 +32,7 @@ it('rejects an incorrect current password without changing the saved password', 
 });
 
 it('requires a strong, confirmed, different new password', function () {
-    $owner = User::factory()->create(['password' => 'Current-owner-pass1']);
+    $owner = User::factory()->withStore()->create(['password' => 'Current-owner-pass1']);
     $this->actingAs($owner);
 
     $this->put(route('password.update'), [
@@ -59,7 +59,7 @@ it('requires a strong, confirmed, different new password', function () {
 });
 
 it('changes the password securely and keeps the owner authenticated', function () {
-    $owner = User::factory()->create(['password' => 'Current-owner-pass1']);
+    $owner = User::factory()->withStore()->create(['password' => 'Current-owner-pass1']);
 
     $this->actingAs($owner)->put(route('password.update'), [
         'current_password' => 'Current-owner-pass1',
@@ -74,7 +74,7 @@ it('changes the password securely and keeps the owner authenticated', function (
 
     $this->post(route('logout'))->assertRedirect(route('login'));
     $this->post(route('login.store'), [
-        'email' => $owner->email,
+        'username' => $owner->username,
         'password' => 'New-owner-password2',
     ])->assertRedirect(route('dashboard'));
 

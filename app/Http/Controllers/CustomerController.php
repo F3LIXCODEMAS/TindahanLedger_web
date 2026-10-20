@@ -5,16 +5,21 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SaveCustomerRequest;
 use App\Models\Customer;
 use App\Models\EmailReminderLog;
+use App\Services\CustomerAccessService;
 use App\Services\CustomerLedgerService;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class CustomerController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $customers = Customer::query()
+        $customers = $request->user()->store->customers()
             ->withSum('ledgerEntries as ledger_credit_total', 'amount')
             ->withSum('payments as customer_payment_total', 'amount')
             ->orderBy('full_name')
@@ -39,8 +44,15 @@ class CustomerController extends Controller
         return view('customers.create', ['customer' => new Customer]);
     }
 
-    public function show(Customer $customer, CustomerLedgerService $customerLedgerService): View
+    /**
+     * Another store's customer gets the same not-found page as a missing one.
+     */
+    public function show(Customer $customer, CustomerLedgerService $customerLedgerService): View|Response
     {
+        if (Gate::denies('view', $customer)) {
+            return response()->view('customers.not-found', status: 404);
+        }
+
         return view('customers.show', [
             'customer' => $customer,
             'ledger' => $customerLedgerService->forCustomer($customer),
@@ -52,21 +64,31 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function store(SaveCustomerRequest $request): RedirectResponse
+    /**
+     * The customer and their QR access credential are created together, so a
+     * failure leaves neither behind.
+     */
+    public function store(SaveCustomerRequest $request, CustomerAccessService $customerAccess): RedirectResponse
     {
-        Customer::query()->create($request->safe()->only([
-            'full_name',
-            'contact_number',
-            'email',
-            'residential_landmark',
-            'credit_limit',
-        ]));
+        DB::transaction(function () use ($request, $customerAccess): void {
+            $customer = $request->user()->store->customers()->create($request->safe()->only([
+                'full_name',
+                'contact_number',
+                'email',
+                'residential_landmark',
+                'credit_limit',
+            ]));
+
+            $customerAccess->issue($customer, $request->user());
+        });
 
         return redirect()->route('customers.index')->with('status', 'Customer added successfully.');
     }
 
     public function edit(Customer $customer): View
     {
+        Gate::authorize('update', $customer);
+
         return view('customers.edit', ['customer' => $customer]);
     }
 

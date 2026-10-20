@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Customer;
 use App\Models\User;
 
 return [
@@ -42,6 +43,12 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Read-only customer self-service portal, signed in by QR credential.
+        'customer' => [
+            'driver' => 'session',
+            'provider' => 'customers',
+        ],
     ],
 
     /*
@@ -65,6 +72,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'customers' => [
+            'driver' => 'eloquent',
+            'model' => Customer::class,
         ],
 
         // 'users' => [

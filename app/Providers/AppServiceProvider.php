@@ -22,6 +22,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('customer-portal-access', function (Request $request): Limit {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+
         RateLimiter::for('email-settings-test', function (Request $request): Limit {
             return Limit::perMinute(3)->by(
                 $request->user()->getAuthIdentifier().'|'.$request->ip(),

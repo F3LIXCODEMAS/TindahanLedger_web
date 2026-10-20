@@ -2331,3 +2331,1061 @@ body.owner-auth-page {
         align-items: baseline;
     }
 }
+
+.overdue-metric-link {
+    display: inline-block;
+    margin-top: 4px;
+    color: var(--color-ledger-green-dark);
+    font-weight: 650;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.overdue-accounts-content {
+    max-width: 1040px;
+}
+
+.overdue-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.65fr) auto;
+    align-items: end;
+    gap: 12px;
+    margin-bottom: 26px;
+    padding: 16px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.overdue-search-field,
+.overdue-sort-field {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+}
+
+.overdue-search-field label,
+.overdue-sort-field label {
+    color: var(--color-ledger-ink);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.overdue-search-field input,
+.overdue-sort-field select {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 5px;
+    color: var(--color-ledger-ink);
+    background: #fff;
+    font: inherit;
+    font-size: 13px;
+}
+
+.overdue-search-field input:focus,
+.overdue-sort-field select:focus {
+    border-color: var(--color-ledger-green);
+    outline: 3px solid rgb(40 99 77 / 14%);
+}
+
+.overdue-filter-button,
+.overdue-ledger-link {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 14px;
+    border: 1px solid var(--color-ledger-green-dark);
+    border-radius: 5px;
+    color: #fff;
+    background: var(--color-ledger-green-dark);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.overdue-filter-button:hover,
+.overdue-ledger-link:hover {
+    background: var(--color-ledger-green);
+}
+
+.overdue-results-heading,
+.overdue-account-heading,
+.overdue-entry-heading,
+.overdue-reminder-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.overdue-results-heading {
+    margin-bottom: 12px;
+}
+
+.overdue-results-heading h2 {
+    margin: 0;
+    color: var(--color-ledger-ink);
+    font-size: 18px;
+    font-weight: 650;
+}
+
+.overdue-results-heading > span {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+}
+
+.overdue-empty {
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.overdue-account-list {
+    display: grid;
+    gap: 14px;
+}
+
+.overdue-account-card {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid var(--color-ledger-line);
+    border-left: 4px solid var(--color-ledger-coral);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.overdue-customer-identity {
+    min-width: 0;
+}
+
+.overdue-customer-identity h3,
+.overdue-entry-heading h4 {
+    margin: 0;
+    color: var(--color-ledger-ink);
+    font-size: 17px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.overdue-customer-identity p,
+.overdue-entry-heading p {
+    margin: 5px 0 0;
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.overdue-account-summary,
+.overdue-entry-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 16px 0 0;
+}
+
+.overdue-account-summary > div,
+.overdue-entry-details > div {
+    min-width: 0;
+    padding: 12px;
+    border-radius: 5px;
+    background: var(--color-ledger-paper);
+}
+
+.overdue-account-summary dt,
+.overdue-entry-details dt {
+    margin-bottom: 5px;
+    color: var(--color-ledger-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.overdue-account-summary dd,
+.overdue-entry-details dd {
+    margin: 0;
+    color: var(--color-ledger-ink);
+    font-size: 14px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+.overdue-account-summary > div:first-child dd,
+.overdue-entry-balance {
+    color: #8f3d2c;
+}
+
+.overdue-entry-list {
+    margin-top: 16px;
+    border-top: 1px solid var(--color-ledger-line);
+}
+
+.overdue-credit-entry {
+    min-width: 0;
+    padding-top: 16px;
+}
+
+.overdue-credit-entry + .overdue-credit-entry {
+    margin-top: 16px;
+    border-top: 1px solid var(--color-ledger-line);
+}
+
+.overdue-entry-heading {
+    align-items: flex-start;
+}
+
+.overdue-entry-heading h4 {
+    font-size: 14px;
+}
+
+.overdue-entry-balance {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.overdue-entry-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.overdue-reminders {
+    margin-top: 14px;
+}
+
+.overdue-reminders h5 {
+    margin: 0 0 8px;
+    color: var(--color-ledger-ink);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.overdue-no-reminders,
+.overdue-reminder-item > p {
+    margin: 0;
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.overdue-reminder-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.overdue-reminder-item {
+    display: grid;
+    gap: 5px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 5px;
+}
+
+.overdue-reminder-heading strong {
+    color: var(--color-ledger-ink);
+    font-size: 12px;
+}
+
+.overdue-reminder-item .ledger-reminder-failure {
+    color: #8f3d2c;
+}
+
+@media (max-width: 700px) {
+    .overdue-controls {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .overdue-filter-button {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 600px) {
+    .overdue-controls {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 14px;
+    }
+
+    .overdue-filter-button {
+        grid-column: auto;
+    }
+
+    .overdue-account-card {
+        padding: 16px;
+    }
+
+    .overdue-account-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .overdue-account-summary,
+    .overdue-entry-details {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .overdue-account-summary > div,
+    .overdue-entry-details > div {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: baseline;
+        gap: 10px;
+    }
+
+    .overdue-account-summary dt,
+    .overdue-entry-details dt {
+        margin: 0;
+    }
+
+    .overdue-account-summary dd,
+    .overdue-entry-details dd {
+        text-align: right;
+    }
+
+    .overdue-entry-heading {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .overdue-entry-balance {
+        text-align: left;
+    }
+}
+
+/* Super Admin screens */
+.admin-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    align-items: end;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding: 16px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.admin-field {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+}
+
+.admin-field label {
+    color: var(--color-ledger-ink);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.admin-field input,
+.admin-field select {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 5px;
+    color: var(--color-ledger-ink);
+    background: #fff;
+    font: inherit;
+    font-size: 13px;
+}
+
+.admin-field input:focus,
+.admin-field select:focus {
+    border-color: var(--color-ledger-green);
+    outline: 3px solid rgb(40 99 77 / 14%);
+}
+
+.admin-button,
+.admin-button-secondary,
+.admin-button-danger {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 14px;
+    border: 1px solid var(--color-ledger-green-dark);
+    border-radius: 5px;
+    color: #fff;
+    background: var(--color-ledger-green-dark);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.admin-button:hover {
+    background: var(--color-ledger-green);
+}
+
+.admin-button-secondary {
+    color: var(--color-ledger-green-dark);
+    background: #fff;
+}
+
+.admin-button-secondary:hover {
+    background: var(--color-ledger-paper);
+}
+
+.admin-button-danger {
+    border-color: var(--color-ledger-coral);
+    background: var(--color-ledger-coral);
+}
+
+.admin-button-danger:hover {
+    background: #a24d32;
+}
+
+.admin-panel {
+    margin-bottom: 20px;
+    padding: 20px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.admin-panel h2 {
+    margin: 0 0 14px;
+    font-size: 17px;
+}
+
+.admin-panel-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.admin-panel-heading h2 {
+    margin: 0;
+}
+
+.admin-muted {
+    color: var(--color-ledger-muted);
+    font-size: 13px;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-ledger-line);
+    text-align: left;
+    vertical-align: top;
+}
+
+.admin-table th {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.admin-table .is-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.admin-table a {
+    color: var(--color-ledger-green-dark);
+    font-weight: 650;
+}
+
+.admin-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--color-ledger-green-dark);
+    background: #e3f0e7;
+}
+
+.admin-status.is-warning {
+    color: #8a3d25;
+    background: #fbe7df;
+}
+
+.admin-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin: 0;
+}
+
+.admin-detail-grid dt {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.admin-detail-grid dd {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.admin-inline-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 12px;
+}
+
+.admin-form {
+    display: grid;
+    max-width: 560px;
+    gap: 4px;
+}
+
+.admin-pagination {
+    margin-top: 16px;
+}
+
+.dashboard-metrics.admin-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1000px) {
+    .dashboard-metrics.admin-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .dashboard-metrics.admin-metrics {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-table thead {
+        display: none;
+    }
+
+    .admin-table tr {
+        display: block;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--color-ledger-line);
+    }
+
+    .admin-table td {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 4px;
+        border-bottom: 0;
+        text-align: right;
+    }
+
+    .admin-table td::before {
+        content: attr(data-label);
+        color: var(--color-ledger-muted);
+        font-size: 12px;
+        font-weight: 650;
+        text-align: left;
+    }
+}
+
+/* Super Admin analytics */
+.analytics-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 10px;
+    color: var(--color-ledger-ink);
+    font-size: 13px;
+}
+
+.analytics-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.analytics-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.analytics-swatch.is-credit,
+.analytics-bar.is-credit {
+    background: #2a78d6;
+    fill: #2a78d6;
+}
+
+.analytics-swatch.is-payment,
+.analytics-bar.is-payment {
+    background: #eb6834;
+    fill: #eb6834;
+}
+
+.analytics-chart {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.analytics-grid {
+    stroke: var(--color-ledger-line);
+    stroke-width: 1;
+}
+
+.analytics-baseline {
+    stroke: var(--color-ledger-muted);
+    stroke-width: 1;
+}
+
+.analytics-axis-label {
+    fill: var(--color-ledger-muted);
+    font-size: 11px;
+}
+
+.analytics-hit-area {
+    fill: transparent;
+}
+
+.analytics-hit-area:hover {
+    fill: rgb(29 51 44 / 6%);
+}
+
+.analytics-table-toggle {
+    margin-top: 14px;
+}
+
+.analytics-table-toggle summary {
+    color: var(--color-ledger-green-dark);
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.analytics-meter {
+    display: block;
+    width: 100%;
+    min-width: 80px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--color-ledger-paper);
+}
+
+.analytics-meter span {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: #2a78d6;
+}
+
+/* Owner QR access code and printable card */
+.access-code-image {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+}
+
+.access-code-image svg {
+    width: min(100%, 280px);
+    height: auto;
+}
+
+.access-card-page {
+    margin: 0;
+    padding: 24px 16px;
+    color: var(--color-ledger-ink);
+    background: #fff;
+}
+
+.access-card-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.access-card {
+    max-width: 340px;
+    margin: 0 auto;
+    padding: 24px;
+    border: 2px dashed var(--color-ledger-line);
+    border-radius: 12px;
+    text-align: center;
+}
+
+.access-card h1 {
+    margin: 4px 0 0;
+    font-size: 22px;
+}
+
+.access-card ol {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 13px;
+    text-align: left;
+}
+
+.access-card-warning {
+    margin: 14px 0 0;
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+}
+
+@media print {
+    .access-card-actions {
+        display: none;
+    }
+
+    .access-card-page {
+        padding: 0;
+    }
+}
+
+/* Customer self-service portal */
+.portal-page {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    color: var(--color-ledger-ink);
+    background: var(--color-ledger-paper);
+}
+
+.portal-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-ledger-line);
+    background: #fff;
+}
+
+.portal-content {
+    width: min(100%, 560px);
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+}
+
+.portal-heading h1 {
+    margin: 4px 0;
+    font-size: 24px;
+    overflow-wrap: anywhere;
+}
+
+.portal-card {
+    margin-top: 16px;
+    padding: 18px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 10px;
+    background: #fff;
+}
+
+.portal-card h2 {
+    margin: 0 0 10px;
+    font-size: 17px;
+}
+
+.portal-entry h1 {
+    margin: 4px 0 12px;
+}
+
+.portal-balance-value {
+    margin: 0;
+    font-size: 34px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.portal-status {
+    display: inline-block;
+    margin: 8px 0 0;
+    color: var(--color-ledger-green-dark);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.portal-status.is-good {
+    color: var(--color-ledger-green);
+}
+
+.portal-status.is-warning {
+    color: var(--color-ledger-coral);
+}
+
+.portal-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 14px 0 0;
+}
+
+.portal-summary dt {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.portal-summary dd {
+    margin: 2px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.portal-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.portal-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-ledger-line);
+}
+
+.portal-list li:last-child {
+    border-bottom: 0;
+}
+
+.portal-history li > div:first-child {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.portal-amount {
+    display: grid;
+    flex-shrink: 0;
+    gap: 2px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.portal-amount .is-payment {
+    color: var(--color-ledger-green);
+}
+
+.portal-muted {
+    color: var(--color-ledger-muted);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.portal-notice {
+    padding: 12px 14px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 8px;
+    background: var(--color-ledger-paper);
+    font-size: 14px;
+}
+
+.portal-loading {
+    font-weight: 650;
+}
+
+.portal-exit-button {
+    min-height: 44px;
+    padding: 8px 18px;
+    border: 1px solid var(--color-ledger-green-dark);
+    border-radius: 6px;
+    color: var(--color-ledger-green-dark);
+    background: #fff;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.portal-footnote {
+    margin-top: 20px;
+    text-align: center;
+}
+
+/* Suki Points redemption on the customer ledger */
+.suki-redeem {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-ledger-line);
+}
+
+.suki-redeem h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+}
+
+.suki-redeem-unavailable {
+    margin: 10px 0 0;
+    padding: 12px 14px;
+    border-radius: 6px;
+    color: var(--color-ledger-muted);
+    background: var(--color-ledger-paper);
+    font-size: 14px;
+}
+
+.suki-redeem-form {
+    display: grid;
+    gap: 12px;
+    max-width: 520px;
+    margin-top: 12px;
+}
+
+.suki-redeem-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin: 0;
+}
+
+.suki-redeem-preview dt {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.suki-redeem-preview dd {
+    margin: 2px 0 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Late payment penalties */
+.penalty-disclosure {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: var(--color-ledger-paper);
+    font-size: 14px;
+}
+
+.penalty-disclosure p {
+    margin: 0;
+}
+
+.penalty-acknowledge {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.penalty-acknowledge input {
+    margin-top: 3px;
+}
+
+.penalty-legal-note {
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border: 1px solid #f0c4b5;
+    border-radius: 5px;
+    color: #8a3d25;
+    background: #fbefea;
+    font-size: 14px;
+}
+
+.ledger-penalty-status {
+    margin: 8px 0 0;
+    color: var(--color-ledger-muted);
+    font-size: 13px;
+}
+
+.ledger-penalty-status.is-applied,
+.ledger-penalty-status.is-eligible {
+    color: var(--color-ledger-coral);
+}
+
+.ledger-penalty-waive {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+/* Late fee integration: principal, fees and total due */
+.ledger-financial-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin: -10px 0 24px;
+    padding: 14px 20px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.ledger-financial-summary dt,
+.overdue-totals dt {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.ledger-financial-summary dd,
+.overdue-totals dd {
+    margin: 2px 0 0;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-metrics.has-financials {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.metric-penalties {
+    border-top: 3px solid var(--color-ledger-gold);
+}
+
+.metric-penalty-counts {
+    display: grid;
+    gap: 4px;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.overdue-totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 0 0 20px;
+    padding: 14px 18px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.overdue-fee-only {
+    margin-top: 32px;
+}
+
+.portal-fee-terms {
+    display: block;
+    margin-top: 2px;
+    font-size: 13px;
+}
+
+@media (max-width: 600px) {
+    .ledger-financial-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 14px 16px;
+    }
+}

@@ -10,7 +10,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SukiPoint extends Model
 {
+    /**
+     * Earning rule: one point for every ₱100.00 actually repaid.
+     */
     public const CENTS_PER_POINT = 10000;
+
+    /**
+     * Redemption rule: each point is worth ₱1.00 of credit against debt.
+     */
+    public const REDEMPTION_CENTS_PER_POINT = 100;
 
     /** @use HasFactory<SukiPointFactory> */
     use HasFactory;
@@ -22,6 +30,8 @@ class SukiPoint extends Model
         'reward_threshold',
         'points_balance',
         'repayment_remainder_cents',
+        'cycle_repaid_cents',
+        'streak_repaid_cents',
         'reward_eligible',
     ];
 
@@ -31,6 +41,8 @@ class SukiPoint extends Model
         'reward_threshold' => 3,
         'points_balance' => 0,
         'repayment_remainder_cents' => 0,
+        'cycle_repaid_cents' => 0,
+        'streak_repaid_cents' => 0,
         'reward_eligible' => false,
     ];
 
@@ -42,6 +54,8 @@ class SukiPoint extends Model
             'reward_threshold' => 'integer',
             'points_balance' => 'integer',
             'repayment_remainder_cents' => 'integer',
+            'cycle_repaid_cents' => 'integer',
+            'streak_repaid_cents' => 'integer',
             'reward_eligible' => 'boolean',
         ];
     }

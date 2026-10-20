@@ -17,21 +17,19 @@ if (passwordToggle instanceof HTMLButtonElement && passwordInput instanceof HTML
 const loginForm = document.querySelector('[data-login-form]');
 
 if (loginForm instanceof HTMLFormElement) {
-	const emailInput = loginForm.querySelector('#email');
+	const usernameInput = loginForm.querySelector('#username');
 	const submitButton = loginForm.querySelector('[data-login-submit]');
 	const submitLabel = loginForm.querySelector('[data-submit-label]');
 	const loadingLabel = loginForm.querySelector('[data-loading-label]');
 
-	if (emailInput instanceof HTMLInputElement) {
-		emailInput.addEventListener('invalid', () => {
-			if (emailInput.validity.valueMissing) {
-				emailInput.setCustomValidity('Please enter your email.');
-			} else if (emailInput.validity.typeMismatch) {
-				emailInput.setCustomValidity('Please enter a valid email address.');
+	if (usernameInput instanceof HTMLInputElement) {
+		usernameInput.addEventListener('invalid', () => {
+			if (usernameInput.validity.valueMissing) {
+				usernameInput.setCustomValidity('Please enter your username.');
 			}
 		});
 
-		emailInput.addEventListener('input', () => emailInput.setCustomValidity(''));
+		usernameInput.addEventListener('input', () => usernameInput.setCustomValidity(''));
 	}
 
 	if (passwordInput instanceof HTMLInputElement) {
@@ -296,6 +294,88 @@ if (paymentForm instanceof HTMLFormElement) {
 			submitButton.setAttribute('aria-busy', 'true');
 			submitLabel.hidden = true;
 			savingLabel.hidden = false;
+		}
+	});
+}
+
+document.addEventListener('submit', (event) => {
+	const form = event.target;
+
+	if (form instanceof HTMLFormElement && form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+		event.preventDefault();
+	}
+});
+
+const portalAccessForm = document.querySelector('[data-portal-access-form]');
+
+if (portalAccessForm instanceof HTMLFormElement) {
+	const accessToken = window.location.hash.slice(1);
+
+	if (window.location.hash !== '') {
+		window.history.replaceState(null, '', window.location.pathname + window.location.search);
+	}
+
+	const tokenInput = portalAccessForm.querySelector('input[name="token"]');
+	const loadingMessage = portalAccessForm.querySelector('[data-portal-loading]');
+	const instructions = document.querySelector('[data-portal-instructions]');
+
+	if (accessToken !== '' && tokenInput instanceof HTMLInputElement) {
+		tokenInput.value = accessToken;
+
+		if (loadingMessage instanceof HTMLElement) {
+			loadingMessage.hidden = false;
+		}
+
+		if (instructions instanceof HTMLElement) {
+			instructions.hidden = true;
+		}
+
+		portalAccessForm.submit();
+	}
+}
+
+document.querySelectorAll('[data-print-page]').forEach((printButton) => {
+	printButton.addEventListener('click', () => window.print());
+});
+
+const sukiRedeemForm = document.querySelector('[data-suki-redeem-form]');
+
+if (sukiRedeemForm instanceof HTMLFormElement) {
+	const pointsInput = sukiRedeemForm.querySelector('input[name="points"]');
+	const creditOutput = sukiRedeemForm.querySelector('[data-redeem-credit]');
+	const balanceOutput = sukiRedeemForm.querySelector('[data-redeem-balance]');
+	const submitButton = sukiRedeemForm.querySelector('[data-redeem-submit]');
+	const centsPerPoint = Number(sukiRedeemForm.dataset.centsPerPoint);
+	const balanceCents = Number(sukiRedeemForm.dataset.balanceCents);
+	const peso = (cents) => `₱${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+
+	// Preview only: the server recalculates and validates the redemption.
+	const updatePreview = () => {
+		if (!(pointsInput instanceof HTMLInputElement) || !creditOutput || !balanceOutput) {
+			return;
+		}
+
+		const points = Number(pointsInput.value);
+
+		if (!Number.isInteger(points) || points < 1) {
+			creditOutput.textContent = '—';
+			balanceOutput.textContent = '—';
+			return;
+		}
+
+		const creditCents = points * centsPerPoint;
+		creditOutput.textContent = peso(creditCents);
+		balanceOutput.textContent = creditCents > balanceCents ? 'More than the balance' : peso(balanceCents - creditCents);
+	};
+
+	pointsInput?.addEventListener('input', updatePreview);
+	updatePreview();
+
+	// Runs after the confirmation handler on document; only disable once the submit really proceeds.
+	window.addEventListener('submit', (event) => {
+		if (event.target === sukiRedeemForm && !event.defaultPrevented && submitButton instanceof HTMLButtonElement) {
+			submitButton.disabled = true;
+			submitButton.textContent = 'Redeeming…';
 		}
 	});
 }

@@ -22,6 +22,26 @@ final class Money
         return ((int) $wholeUnits * 100) + (int) str_pad($fractionalUnits, 2, '0');
     }
 
+    /**
+     * Convert an aggregate returned by the database (a DECIMAL string on
+     * MySQL, or possibly a float on SQLite) into integer cents.
+     */
+    public static function sumToCents(mixed $databaseSum): int
+    {
+        if ($databaseSum === null || $databaseSum === '') {
+            return 0;
+        }
+
+        $databaseSum = is_string($databaseSum) && preg_match('/^-?\d+(?:\.\d{1,2})?$/D', trim($databaseSum))
+            ? trim($databaseSum)
+            : number_format((float) $databaseSum, 2, '.', '');
+
+        $isNegative = str_starts_with($databaseSum, '-');
+        $amountInCents = self::toCents(ltrim($databaseSum, '-'));
+
+        return $isNegative ? -$amountInCents : $amountInCents;
+    }
+
     public static function fromCents(int $amountInCents): string
     {
         $sign = $amountInCents < 0 ? '-' : '';
