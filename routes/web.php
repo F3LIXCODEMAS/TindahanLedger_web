@@ -26,6 +26,7 @@ use App\Http\Controllers\StoreEmailSettingsController;
 use App\Http\Controllers\SukiPointRedemptionController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ChatbotControllers;
 
 Route::redirect('/', '/login');
 
@@ -79,6 +80,10 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_SUPER_ADMIN])
 
 Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    Route::post('/chatbot', [ChatbotControllers::class, 'chat'])
+        ->name('chatbot.chat');
+        
     Route::get('/overdue-accounts', OverdueAccountController::class)->name('overdue-accounts.index');
 
     Route::get('/settings/email-notifications', [StoreEmailSettingsController::class, 'edit'])
