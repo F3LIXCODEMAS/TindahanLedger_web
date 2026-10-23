@@ -89,3 +89,71 @@ php artisan reminders:send-due
 ```
 
 The command prints processed, sent, skipped, and failed counts. Failed sends and reminders skipped for a missing or invalid customer email are retained in the reminder history and retried on a later scheduled run when eligible. Successful reminders are not sent again for the same ledger entry, reminder type, and scheduled date. SMTP delivery cannot guarantee exactly-once behavior if the provider accepts a message but the application fails before recording success; a retry may then produce a duplicate.
+
+## External basket dataset validation (DUMS-38)
+
+External market-basket data may later seed *global* fallback product recommendations. Before any of it is used, it is validated with a command that is **validation only**: it never writes to the database, never creates products, customers, purchases, credits, payments, penalties, or Suki Points, and never activates a model.
+
+### Supplying a dataset
+
+1. Place the CSV inside the project, for example `database/transaction.csv`. Do not commit it until its license is known and allows redistribution.
+2. Record where it came from: source URL, title, version, license, and download date.
+
+### Running validation
+
+```powershell
+php artisan dataset:validate-baskets database/transaction.csv --source-url="https://..." --title="..." --dataset-version="..." --license="..." --downloaded-at=2026-10-23
+```
+
+The command prints a summary and saves the full JSON report to `storage/app/private/dataset-validation/<sha256>.json` (use `--no-report` to skip saving). The SHA-256 checksum identifies the exact file version. The command exits with an error when the file cannot be validated or has no acceptable baskets. Missing source or license details are reported as "not provided"; such a dataset cannot be approved for import.
+
+### Supported format
+
+Measured from the supplied file, not assumed: UTF-8, comma-delimited, header exactly `Transaction_ID,itemset`, one basket per row, and `itemset` written as a Python-style list of quoted labels such as `['Milk', 'Bread']`. Any other header is rejected as a file error rather than guessed at.
+
+### Validation rules and duplicate policy
+
+Every exclusion is listed in the report with its line number, transaction ID, and reason. Nothing is dropped silently.
+
+| Situation | Handling |
+|---|---|
+| Missing or unreadable file, empty file, unexpected header | File error; validation stops |
+| Byte order mark | Skipped and reported |
+| Row not valid UTF-8 | Row rejected (`invalid_encoding`) |
+| Wrong number of fields | Row rejected (`wrong_field_count`) |
+| Empty transaction ID | Row rejected (`missing_transaction_id`) |
+| Transaction ID already used | Later row rejected (`duplicate_transaction_id`); the first occurrence is kept |
+| Itemset is not a list of quoted labels | Row rejected (`malformed_itemset`) |
+| Empty list | Row rejected (`empty_basket`) |
+| Blank label, or label over 120 characters | Row rejected (`blank_label`, `label_too_long`) |
+| Same label twice in one basket | Kept once and reported as a warning (`repeated_label`); a basket is a set of products |
+| Blank line | Skipped and reported as a warning |
+| Identical baskets under different IDs | Kept, because repeat purchases are real, and counted as `repeated_item_sets` |
+
+Labels are normalized with the product catalog's rule: trim, collapse spaces, lowercase. Each normalized label is reported with the original spellings it came from. Curly apostrophes, as in `Lay’s`, are kept as written.
+
+The report also includes an independence check: the lift of every product pair that appears together in at least 20 baskets. If lift is close to 1 for nearly every pair, products were picked independently and association rules mined from the data would be noise.
+
+### Current dataset: `database/transaction.csv`
+
+| Measure | Result |
+|---|---|
+| SHA-256 | `ed19771073ebb32240a7bed9fc24cb263f936cd269fe49bc03da953d40bc0707` |
+| Size | 168,330 bytes, UTF-8, no byte order mark, LF line endings |
+| Baskets | 1,000 rows, all accepted; IDs `t1` to `t1000`, no duplicates |
+| Products | 64 distinct labels, 11,477 item occurrences |
+| Basket size | 7 to 17 items, median 12 |
+| Quantities, prices, dates, cancellations, returns | Not present in the file |
+| Lift of the 961 pairs seen in at least 20 baskets | Median 0.99; 90% between 0.81 and 1.21; highest 1.53 |
+| Source, license, version, download date | Unknown |
+
+**Suitability decision: development experiments only. Not approved for customer-facing recommendations.**
+
+- The product pairs show no association beyond chance. Pairs that sell together in practice, such as shampoo and conditioner, have lift near 1. The data looks synthetic, with items drawn independently.
+- The baskets do not resemble sari-sari store purchases. They hold 7 to 17 items, while sari-sari purchases are typically one to a few items. The products are Indian supermarket brands plus household goods such as curtains, bedsheets, and pillow covers.
+- Generic and branded labels overlap, for example "Toothpaste" and "Colgate Toothpaste", so the same need is split across labels.
+- The source and license are unknown, so the file must not be redistributed or imported.
+
+### Not yet implemented
+
+Importing external baskets is intentionally not built. Before it is, a dataset must have a known source and license, pass validation, and pass a suitability review. The import must then keep external baskets in their own storage, separate from store purchase history; track the checksum to refuse a second import of the same file; and never replace a working model with a failed or partial run.
