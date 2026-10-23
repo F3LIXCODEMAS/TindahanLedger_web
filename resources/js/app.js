@@ -223,9 +223,12 @@ if (creditForm instanceof HTMLFormElement) {
 	});
 }
 
-// Record Credit product picker (DUMS-36). Totals use whole centavos and
-// thousandths (BigInt) with half-up rounding, matching LedgerService. The
-// subtotal is a reference only; the entered amount is never changed.
+// Product picker for Record Credit (DUMS-36) and Record Cash Purchase
+// (DUMS-37). Totals use whole centavos and thousandths (BigInt) with
+// half-up rounding, matching the server. In credit mode the subtotal is a
+// reference only and the entered amount is never changed. In cash mode each
+// row has a sale-only price and the reviewed total is submitted as
+// expected_total so the server can reject a stale or altered total.
 const creditProducts = document.querySelector('[data-credit-products]');
 
 if (creditProducts instanceof HTMLElement) {
@@ -239,7 +242,10 @@ if (creditProducts instanceof HTMLElement) {
 	const subtotalOutput = creditProducts.querySelector('[data-credit-item-subtotal]');
 	const differenceOutput = creditProducts.querySelector('[data-credit-item-difference]');
 	const amountInput = document.querySelector('#amount');
+	const expectedTotalInput = creditProducts.querySelector('[data-expected-total]');
+	const isCashSale = creditProducts.dataset.mode === 'cash';
 	const quantityMessage = 'Enter a quantity greater than zero with up to 3 decimal places.';
+	const priceMessage = 'Enter a price of zero or more with no more than two decimal places.';
 
 	if (
 		productSearch instanceof HTMLInputElement
@@ -291,6 +297,12 @@ if (creditProducts instanceof HTMLElement) {
 		const itemRows = () => Array.from(itemList.querySelectorAll('[data-credit-item]'));
 		const selectedProductIds = () => new Set(itemRows().map((row) => row.dataset.productId));
 
+		const setExpectedTotal = (value) => {
+			if (expectedTotalInput instanceof HTMLInputElement) {
+				expectedTotalInput.value = value;
+			}
+		};
+
 		const updateTotals = () => {
 			const rows = itemRows();
 			let subtotal = 0n;
@@ -298,15 +310,21 @@ if (creditProducts instanceof HTMLElement) {
 			let rowsWithInvalidQuantity = 0;
 
 			itemSummary.hidden = rows.length === 0;
+			setExpectedTotal('');
 
 			rows.forEach((row) => {
 				const quantityInput = row.querySelector('[data-credit-item-quantity]');
+				const priceInput = row.querySelector('[data-credit-item-unit-price]');
 				const totalOutput = row.querySelector('[data-credit-item-total]');
-				const unitPrice = toCents(row.dataset.unitPrice);
+				const unitPrice = priceInput instanceof HTMLInputElement ? toCents(priceInput.value) : toCents(row.dataset.unitPrice);
 				const quantity = quantityInput instanceof HTMLInputElement ? toThousandths(quantityInput.value) : null;
 
 				if (quantityInput instanceof HTMLInputElement) {
 					quantityInput.setCustomValidity(quantity === null ? quantityMessage : '');
+				}
+
+				if (priceInput instanceof HTMLInputElement) {
+					priceInput.setCustomValidity(unitPrice === null ? priceMessage : '');
 				}
 
 				if (!(totalOutput instanceof HTMLElement)) {
@@ -318,13 +336,30 @@ if (creditProducts instanceof HTMLElement) {
 					totalOutput.textContent = '—';
 				} else if (unitPrice === null) {
 					rowsWithoutPrice += 1;
-					totalOutput.textContent = 'No price';
+					totalOutput.textContent = isCashSale ? 'Enter price' : 'No price';
 				} else {
 					const lineTotal = ((unitPrice * quantity) + 500n) / 1000n;
 					subtotal += lineTotal;
 					totalOutput.textContent = formatCents(lineTotal);
 				}
 			});
+
+			if (isCashSale) {
+				if (rowsWithInvalidQuantity > 0 || rowsWithoutPrice > 0) {
+					subtotalLabel.textContent = 'Total (incomplete)';
+					subtotalOutput.textContent = '—';
+					differenceOutput.textContent = rowsWithInvalidQuantity > 0
+						? 'Fix the highlighted quantities to see the total.'
+						: 'Enter a price for every product to see the total.';
+					return;
+				}
+
+				subtotalLabel.textContent = 'Total';
+				subtotalOutput.textContent = formatCents(subtotal);
+				differenceOutput.textContent = 'Paid in cash now. This does not change any customer balance.';
+				setExpectedTotal(`${subtotal / 100n}.${(subtotal % 100n).toString().padStart(2, '0')}`);
+				return;
+			}
 
 			if (rowsWithInvalidQuantity > 0 || rowsWithoutPrice > 0) {
 				subtotalLabel.textContent = 'Item subtotal (incomplete)';
@@ -399,6 +434,7 @@ if (creditProducts instanceof HTMLElement) {
 			const productField = row.querySelector('[data-credit-item-product]');
 			const nameOutput = row.querySelector('[data-credit-item-name]');
 			const priceOutput = row.querySelector('[data-credit-item-price]');
+			const priceField = row.querySelector('[data-credit-item-unit-price]');
 			const removeButton = row.querySelector('[data-credit-item-remove]');
 
 			if (productField instanceof HTMLInputElement) {
@@ -409,8 +445,16 @@ if (creditProducts instanceof HTMLElement) {
 				nameOutput.textContent = product.name;
 			}
 
+			if (priceField instanceof HTMLInputElement) {
+				priceField.value = product.unit_price ?? '';
+			}
+
 			if (priceOutput instanceof HTMLElement) {
-				priceOutput.textContent = product.unit_price === null ? 'No price set' : `₱${product.unit_price} each`;
+				if (isCashSale) {
+					priceOutput.textContent = product.unit_price === null ? 'No catalog price' : `Catalog price ₱${product.unit_price}`;
+				} else {
+					priceOutput.textContent = product.unit_price === null ? 'No price set' : `₱${product.unit_price} each`;
+				}
 			}
 
 			removeButton?.setAttribute('aria-label', `Remove ${product.name}`);
@@ -480,7 +524,7 @@ if (creditProducts instanceof HTMLElement) {
 		});
 
 		itemList.addEventListener('input', (event) => {
-			if (event.target instanceof HTMLElement && event.target.matches('[data-credit-item-quantity]')) {
+			if (event.target instanceof HTMLElement && event.target.matches('[data-credit-item-quantity], [data-credit-item-unit-price]')) {
 				updateTotals();
 			}
 		});

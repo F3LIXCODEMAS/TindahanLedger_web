@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\UserPasswordController;
 use App\Http\Controllers\Admin\UserStatusController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\CashPurchaseController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerAccessCodeController;
 use App\Http\Controllers\CustomerController;
@@ -114,6 +115,9 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
         Route::get('/credits/create', [CreditController::class, 'create'])->name('credits.create');
         Route::post('/credits', [CreditController::class, 'store'])->name('credits.store');
 
+        Route::get('/cash-purchases/create', [CashPurchaseController::class, 'create'])->name('cash-purchases.create');
+        Route::post('/cash-purchases', [CashPurchaseController::class, 'store'])->name('cash-purchases.store');
+
         Route::get('/payments/create', [PaymentController::class, 'create'])->name('payments.create');
         Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
 
@@ -151,4 +155,8 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])
         ->name('customers.show')
         ->missing(fn () => response()->view('customers.not-found', status: 404));
+
+    Route::get('/cash-purchases/{purchase}', [CashPurchaseController::class, 'show'])
+        ->whereNumber('purchase')
+        ->name('cash-purchases.show');
 });

@@ -2210,9 +2210,21 @@ body.owner-auth-page {
     color: var(--color-ledger-muted);
 }
 
+.credit-item-row.has-price-input {
+    grid-template-columns: minmax(0, 1fr) 96px 112px minmax(72px, auto) auto;
+}
+
 @media (max-width: 600px) {
     .credit-item-row {
         grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+
+    .credit-item-row.has-price-input {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .credit-item-row.has-price-input .credit-item-remove {
+        justify-self: end;
     }
 
     .credit-item-name {

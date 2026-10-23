@@ -107,6 +107,10 @@
                     <span class="action-mark action-mark-neutral" aria-hidden="true">≡</span>
                     <span><strong>Customer list</strong><small>Review and update customer details</small></span>
                 </a>
+                <a class="dashboard-action-link" href="{{ route('cash-purchases.create') }}">
+                    <span class="action-mark action-mark-neutral" aria-hidden="true">₱</span>
+                    <span><strong>Record cash purchase</strong><small>Products paid in full now, not credit</small></span>
+                </a>
             </div>
         </section>
 

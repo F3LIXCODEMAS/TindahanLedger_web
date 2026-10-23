@@ -10,9 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * What was bought on one ledger credit (DUMS-36). Purchases are descriptive
- * transaction data for later basket analysis; the linked ledger entry's
- * amount remains what the customer owes. Created only by LedgerService.
+ * A basket of products bought in one transaction, kept for later basket
+ * analysis.
+ *
+ * - `utang` (DUMS-36): describes one ledger credit; the ledger entry's
+ *   amount remains what the customer owes. Created by LedgerService.
+ * - `cash` (DUMS-37): a sale paid on the spot. It has no ledger entry, may
+ *   have no customer (walk-in), and never affects debt, payments, or Suki
+ *   Points. Created by CashPurchaseService.
  */
 class Purchase extends Model
 {
@@ -21,9 +26,11 @@ class Purchase extends Model
 
     public const TYPE_UTANG = 'utang';
 
+    public const TYPE_CASH = 'cash';
+
     /**
-     * The store, customer, ledger entry, type, and recorder are set
-     * explicitly by LedgerService, never through mass assignment.
+     * The store, customer, ledger entry, type, recorder, and idempotency key
+     * are set explicitly by the services, never through mass assignment.
      *
      * @var list<string>
      */
@@ -34,6 +41,11 @@ class Purchase extends Model
         return [
             'purchase_date' => 'date',
         ];
+    }
+
+    public function isCash(): bool
+    {
+        return $this->purchase_type === self::TYPE_CASH;
     }
 
     public function store(): BelongsTo

@@ -5,7 +5,9 @@ namespace Database\Factories;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Purchase;
+use App\Models\Store;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * The customer and store follow the ledger entry, so factory-built
@@ -28,5 +30,20 @@ class PurchaseFactory extends Factory
             'purchase_date' => fn (array $attributes): string => LedgerEntry::query()->findOrFail($attributes['ledger_entry_id'])->transaction_date->toDateString(),
             'recorded_by_user_id' => null,
         ];
+    }
+
+    /**
+     * A walk-in cash sale: no ledger entry and no customer.
+     */
+    public function cash(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'store_id' => Store::factory(),
+            'customer_id' => null,
+            'ledger_entry_id' => null,
+            'purchase_type' => Purchase::TYPE_CASH,
+            'purchase_date' => now()->toDateString(),
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
     }
 }

@@ -99,41 +99,7 @@
                         <p class="field-error" id="amount-error" role="alert" @if (!$errors->has('amount')) hidden @endif>@error('amount'){{ $message }}@enderror</p>
                     </div>
 
-                    <section class="credit-products" aria-labelledby="credit-products-title" data-credit-products data-search-url="{{ route('credits.products') }}">
-                        <div class="credit-products-heading">
-                            <h2 id="credit-products-title">Products <span class="credit-optional">Optional</span></h2>
-                            <p class="password-requirements">Pick items from your catalog. Quantities can have up to 3 decimal places, for example 0.25. The amount above stays what the customer owes; the item subtotal is only a reference.</p>
-                        </div>
-
-                        <div class="form-field">
-                            <label for="credit-product-search">Search your products</label>
-                            <input class="auth-input" id="credit-product-search" type="search" autocomplete="off" maxlength="120" placeholder="Product name" data-credit-product-search aria-describedby="credit-product-status">
-                            <p class="credit-search-status" id="credit-product-status" aria-live="polite" data-credit-product-status></p>
-                            <ul class="credit-product-results" data-credit-product-results hidden></ul>
-                        </div>
-
-                        @php($itemErrors = collect($errors->getMessages())->filter(fn ($messages, $key) => $key === 'items' || str_starts_with($key, 'items.'))->flatten()->unique())
-                        <div class="field-error" id="credit-items-error" role="alert" @if ($itemErrors->isEmpty()) hidden @endif>
-                            @foreach ($itemErrors as $itemError)
-                                <p>{{ $itemError }}</p>
-                            @endforeach
-                        </div>
-
-                        <ul class="credit-item-list" data-credit-item-list data-next-index="{{ count($selectedItems) }}">
-                            @foreach ($selectedItems as $index => $selectedItem)
-                                @include('credits.partials.item-row', ['index' => $index, 'item' => $selectedItem])
-                            @endforeach
-                        </ul>
-
-                        <template data-credit-item-template>
-                            @include('credits.partials.item-row', ['index' => '__INDEX__', 'item' => null])
-                        </template>
-
-                        <div class="credit-item-summary" data-credit-item-summary @if ($selectedItems === []) hidden @endif>
-                            <p><span data-credit-item-subtotal-label>Item subtotal (reference)</span> <strong data-credit-item-subtotal>—</strong></p>
-                            <p class="credit-item-difference" data-credit-item-difference aria-live="polite"></p>
-                        </div>
-                    </section>
+                    @include('credits.partials.product-picker', ['mode' => 'credit', 'selectedItems' => $selectedItems])
 
                     <div class="form-field">
                         <label for="itemized_list">Other items <span class="credit-optional">Optional</span></label>
