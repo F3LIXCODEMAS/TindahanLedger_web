@@ -2008,6 +2008,14 @@ body.owner-auth-page {
     gap: 10px;
 }
 
+.customer-record-main .admin-status {
+    margin-top: 6px;
+}
+
+.product-description-detail {
+    grid-column: 1 / -1;
+}
+
 .credit-page-content {
     padding-top: 22px;
 }

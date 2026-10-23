@@ -15,6 +15,7 @@
         <nav class="owner-navigation" aria-label="Owner navigation">
             <a class="owner-nav-link" href="{{ route('dashboard') }}">Dashboard</a>
             <a class="owner-nav-link is-current" href="{{ route('customers.index') }}" aria-current="page">Customers</a>
+            <a class="owner-nav-link" href="{{ route('products.index') }}">Products</a>
             <a class="owner-nav-link" href="{{ route('password.edit') }}">Change password</a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
