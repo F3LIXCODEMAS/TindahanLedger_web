@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\CreditLimitExceeded;
+use App\Exceptions\InvalidPurchaseItems;
 use App\Exceptions\PaymentExceedsBalance;
 use App\Exceptions\StoreSuspended;
 use App\Exceptions\SukiPointRedemptionRejected;
@@ -10,12 +11,15 @@ use App\Models\Customer;
 use App\Models\DebtCycleCompletion;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\Store;
 use App\Models\StorePenaltyPolicy;
 use App\Models\SukiPoint;
 use App\Models\SukiPointTransaction;
 use App\Models\User;
 use App\Support\Money;
+use App\Support\Quantity;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +27,10 @@ use Illuminate\Support\Str;
 
 class LedgerService
 {
+    public const MAX_PURCHASE_ITEMS = 50;
+
+    private const UNAVAILABLE_PRODUCTS_MESSAGE = 'One or more selected products are not available in your active catalog. Remove them and try again.';
+
     /**
      * A credit with a repayment deadline falls under the store's late payment
      * policy only when that policy is active and the owner confirmed the
@@ -30,7 +38,14 @@ class LedgerService
      * values are copied onto the credit, so later policy changes never
      * affect it.
      *
-     * @param  array{amount: float|int|string, itemized_list?: array<int, mixed>|null, note?: string|null, transaction_date?: string, repayment_deadline?: string|null, idempotency_key?: string|null, penalty_policy_acknowledged?: bool}  $attributes
+     * Optional `items` are structured purchase details (DUMS-36). They are
+     * checked against the customer's store and active catalog under a shared
+     * lock and saved with the credit in the same transaction. They describe
+     * the credit; they never change its amount or the customer's balance.
+     *
+     * @param  array{amount: float|int|string, itemized_list?: array<int, mixed>|null, note?: string|null, transaction_date?: string, repayment_deadline?: string|null, idempotency_key?: string|null, penalty_policy_acknowledged?: bool, items?: list<array{product_id: int|string, quantity: int|string}>, recorded_by_user_id?: int|null}  $attributes
+     *
+     * @throws InvalidPurchaseItems
      */
     public function recordCredit(Customer $customer, array $attributes): LedgerEntry
     {
@@ -54,6 +69,7 @@ class LedgerService
                 throw new \InvalidArgumentException('A credit amount must be greater than zero.');
             }
 
+            $purchaseLines = $this->preparePurchaseLines($lockedCustomer, $attributes['items'] ?? []);
             $currentBalanceInCents = $this->outstandingBalanceInCents($lockedCustomer);
             $projectedBalanceInCents = $currentBalanceInCents + $amountInCents;
             $creditLimitInCents = Money::toCents($lockedCustomer->credit_limit);
@@ -79,6 +95,10 @@ class LedgerService
             ]);
 
             $lockedCustomer->update(['current_balance' => Money::fromCents($projectedBalanceInCents)]);
+
+            if ($purchaseLines !== []) {
+                $this->recordPurchase($lockedCustomer, $entry, $purchaseLines, $attributes['recorded_by_user_id'] ?? null);
+            }
 
             return $entry;
         });
@@ -458,6 +478,97 @@ class LedgerService
         $today = CarbonImmutable::now((string) config('app.timezone'))->startOfDay();
 
         return $policy?->appliesOn($today) ? $policy->snapshot() : null;
+    }
+
+    /**
+     * Turn submitted items into purchase lines with name and price
+     * snapshots. Products are read with a shared lock, so a concurrent
+     * deactivation waits for this credit to finish, and only active products
+     * of the customer's store are accepted.
+     *
+     * @param  array<int, mixed>  $items
+     * @return list<array{product_id: int, product_name_snapshot: string, quantity: string, unit_price_snapshot: string|null, line_total: string|null}>
+     */
+    private function preparePurchaseLines(Customer $lockedCustomer, array $items): array
+    {
+        if ($items === []) {
+            return [];
+        }
+
+        if (count($items) > self::MAX_PURCHASE_ITEMS) {
+            throw new InvalidPurchaseItems('A credit can list at most '.self::MAX_PURCHASE_ITEMS.' products.');
+        }
+
+        $quantitiesByProductId = [];
+
+        foreach ($items as $item) {
+            $productId = is_array($item) ? filter_var($item['product_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+
+            if ($productId === false) {
+                throw new InvalidPurchaseItems(self::UNAVAILABLE_PRODUCTS_MESSAGE);
+            }
+
+            if (array_key_exists($productId, $quantitiesByProductId)) {
+                throw new InvalidPurchaseItems('Each product can only be added once.');
+            }
+
+            $quantity = $item['quantity'] ?? null;
+
+            try {
+                $quantitiesByProductId[$productId] = Quantity::toThousandths(is_int($quantity) || is_string($quantity) ? $quantity : '');
+            } catch (\InvalidArgumentException $exception) {
+                throw new InvalidPurchaseItems($exception->getMessage());
+            }
+        }
+
+        $products = Product::query()
+            ->where('store_id', $lockedCustomer->store_id)
+            ->whereKey(array_keys($quantitiesByProductId))
+            ->sharedLock()
+            ->get()
+            ->keyBy('id');
+        $lines = [];
+
+        foreach ($quantitiesByProductId as $productId => $quantityInThousandths) {
+            $product = $products->get($productId);
+
+            if ($product === null || ! $product->isActive()) {
+                throw new InvalidPurchaseItems(self::UNAVAILABLE_PRODUCTS_MESSAGE);
+            }
+
+            $unitPriceInCents = $product->unit_price === null ? null : Money::toCents($product->unit_price);
+            $lines[] = [
+                'product_id' => $product->getKey(),
+                'product_name_snapshot' => $product->name,
+                'quantity' => Quantity::fromThousandths($quantityInThousandths),
+                'unit_price_snapshot' => $unitPriceInCents === null ? null : Money::fromCents($unitPriceInCents),
+                'line_total' => $unitPriceInCents === null
+                    ? null
+                    : Money::fromCents(Money::lineTotalCents($unitPriceInCents, $quantityInThousandths)),
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param  list<array{product_id: int, product_name_snapshot: string, quantity: string, unit_price_snapshot: string|null, line_total: string|null}>  $lines
+     */
+    private function recordPurchase(Customer $lockedCustomer, LedgerEntry $entry, array $lines, ?int $recordedByUserId): void
+    {
+        $purchase = new Purchase;
+        $purchase->forceFill([
+            'store_id' => $lockedCustomer->store_id,
+            'customer_id' => $lockedCustomer->getKey(),
+            'ledger_entry_id' => $entry->getKey(),
+            'purchase_type' => Purchase::TYPE_UTANG,
+            'purchase_date' => $entry->transaction_date,
+            'recorded_by_user_id' => $recordedByUserId,
+        ])->save();
+
+        foreach ($lines as $line) {
+            $purchase->items()->forceCreate([...$line, 'store_id' => $lockedCustomer->store_id]);
+        }
     }
 
     public function outstandingBalanceInCents(Customer $customer): int

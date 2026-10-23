@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\Customer;
 use App\Models\LedgerEntry;
+use App\Models\PurchaseItem;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -20,7 +21,9 @@ class CreditEntryReceipt extends Mailable
         public LedgerEntry $ledgerEntry,
         public ?string $storeName = null,
     ) {
-        $items = [];
+        $items = $ledgerEntry->purchase?->items
+            ->map(fn (PurchaseItem $item): string => $item->description())
+            ->all() ?? [];
 
         foreach ($ledgerEntry->itemized_list ?? [] as $item) {
             if (! is_string($item)) {

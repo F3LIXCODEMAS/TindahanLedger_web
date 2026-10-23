@@ -42,6 +42,17 @@ final class Money
         return $isNegative ? -$amountInCents : $amountInCents;
     }
 
+    /**
+     * Line total for a unit price and a quantity in thousandths, rounded
+     * half up to the nearest centavo. Both values are non-negative, and the
+     * largest product (price below 10^12 centavos times quantity up to 10^6
+     * thousandths) stays within a 64-bit integer.
+     */
+    public static function lineTotalCents(int $unitPriceInCents, int $quantityInThousandths): int
+    {
+        return intdiv(($unitPriceInCents * $quantityInThousandths) + 500, 1000);
+    }
+
     public static function fromCents(int $amountInCents): string
     {
         $sign = $amountInCents < 0 ? '-' : '';

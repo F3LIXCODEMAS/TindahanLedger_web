@@ -46,6 +46,7 @@ class OverdueAccountService
                     $query
                         ->with([
                             'latePenalty',
+                            'purchase.items',
                             'emailReminderLogs' => fn (Relation $reminders): Relation => $reminders
                                 ->orderByDesc('scheduled_reminder_date')
                                 ->orderByDesc('id'),

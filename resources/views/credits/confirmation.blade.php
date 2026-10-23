@@ -45,6 +45,22 @@
                 </div>
             </dl>
 
+            @if ($ledgerEntry->purchase)
+                <section class="credit-confirmation-items" aria-labelledby="credit-confirmation-items-title">
+                    <h2 id="credit-confirmation-items-title">Products</h2>
+                    <ul>
+                        @foreach ($ledgerEntry->purchase->items as $purchaseItem)
+                            <li>{{ $purchaseItem->description() }}</li>
+                        @endforeach
+                    </ul>
+                    @if ($ledgerEntry->purchase->referenceSubtotal() !== null)
+                        <p>Item subtotal (reference only): ₱{{ $ledgerEntry->purchase->referenceSubtotal() }}. The credit of ₱{{ $ledgerEntry->amount }} is what the customer owes.</p>
+                    @else
+                        <p>Item subtotal unavailable because some products have no price. The credit of ₱{{ $ledgerEntry->amount }} is what the customer owes.</p>
+                    @endif
+                </section>
+            @endif
+
             <div class="credit-confirmation-actions">
                 <a class="login-submit" href="{{ route('customers.show', $customer) }}">View Customer Ledger</a>
                 <a class="customer-ledger-link" href="{{ route('credits.create', ['customer_id' => $customer->id]) }}">Record Another Credit</a>

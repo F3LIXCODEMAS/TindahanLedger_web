@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Product;
 use App\Services\LatePenaltyService;
+use App\Services\LedgerService;
+use App\Support\Quantity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -30,6 +33,17 @@ class StoreCreditRequest extends FormRequest
             'penalty_policy_acknowledged' => $this->filled('repayment_deadline') && $this->latePenaltyPolicyApplies()
                 ? ['accepted']
                 : ['nullable'],
+            'items' => ['nullable', 'array', 'max:'.LedgerService::MAX_PURCHASE_ITEMS],
+            'items.*' => ['array:product_id,quantity'],
+            'items.*.product_id' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('products', 'id')
+                    ->where('store_id', $this->user()?->store?->getKey())
+                    ->where('status', Product::STATUS_ACTIVE),
+            ],
+            'items.*.quantity' => ['required', 'string', 'regex:'.Quantity::PATTERN, 'numeric', 'gt:0', 'max:'.Quantity::MAXIMUM],
         ];
     }
 
@@ -41,6 +55,18 @@ class StoreCreditRequest extends FormRequest
         return [
             'penalty_policy_acknowledged.required' => 'Confirm that the customer was told about the late payment policy.',
             'penalty_policy_acknowledged.accepted' => 'Confirm that the customer was told about the late payment policy.',
+            'items.max' => 'A credit can list at most '.LedgerService::MAX_PURCHASE_ITEMS.' products.',
+            'items.*.array' => 'Choose products from your active catalog.',
+            'items.*.product_id.required' => 'Choose products from your active catalog.',
+            'items.*.product_id.integer' => 'Choose products from your active catalog.',
+            'items.*.product_id.exists' => 'One or more selected products are not available in your active catalog. Remove them and try again.',
+            'items.*.product_id.distinct' => 'Each product can only be added once.',
+            'items.*.quantity.required' => 'Enter a quantity for each selected product.',
+            'items.*.quantity.string' => Quantity::FORMAT_MESSAGE,
+            'items.*.quantity.regex' => Quantity::FORMAT_MESSAGE,
+            'items.*.quantity.numeric' => Quantity::FORMAT_MESSAGE,
+            'items.*.quantity.gt' => Quantity::FORMAT_MESSAGE,
+            'items.*.quantity.max' => Quantity::MAXIMUM_MESSAGE,
         ];
     }
 

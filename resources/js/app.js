@@ -223,6 +223,283 @@ if (creditForm instanceof HTMLFormElement) {
 	});
 }
 
+// Record Credit product picker (DUMS-36). Totals use whole centavos and
+// thousandths (BigInt) with half-up rounding, matching LedgerService. The
+// subtotal is a reference only; the entered amount is never changed.
+const creditProducts = document.querySelector('[data-credit-products]');
+
+if (creditProducts instanceof HTMLElement) {
+	const productSearch = creditProducts.querySelector('[data-credit-product-search]');
+	const productStatus = creditProducts.querySelector('[data-credit-product-status]');
+	const productResults = creditProducts.querySelector('[data-credit-product-results]');
+	const itemList = creditProducts.querySelector('[data-credit-item-list]');
+	const itemTemplate = creditProducts.querySelector('[data-credit-item-template]');
+	const itemSummary = creditProducts.querySelector('[data-credit-item-summary]');
+	const subtotalLabel = creditProducts.querySelector('[data-credit-item-subtotal-label]');
+	const subtotalOutput = creditProducts.querySelector('[data-credit-item-subtotal]');
+	const differenceOutput = creditProducts.querySelector('[data-credit-item-difference]');
+	const amountInput = document.querySelector('#amount');
+	const quantityMessage = 'Enter a quantity greater than zero with up to 3 decimal places.';
+
+	if (
+		productSearch instanceof HTMLInputElement
+		&& productStatus instanceof HTMLElement
+		&& productResults instanceof HTMLElement
+		&& itemList instanceof HTMLElement
+		&& itemTemplate instanceof HTMLTemplateElement
+		&& itemSummary instanceof HTMLElement
+		&& subtotalLabel instanceof HTMLElement
+		&& subtotalOutput instanceof HTMLElement
+		&& differenceOutput instanceof HTMLElement
+	) {
+		let nextIndex = Number(itemList.dataset.nextIndex ?? '0');
+		let lastResults = [];
+		let searchTimer;
+		let searchController;
+
+		const toCents = (value) => {
+			const amount = String(value ?? '').trim();
+
+			if (!/^\d+(?:\.\d{1,2})?$/.test(amount)) {
+				return null;
+			}
+
+			const [whole, fraction = ''] = amount.split('.');
+
+			return (BigInt(whole) * 100n) + BigInt(fraction.padEnd(2, '0'));
+		};
+
+		const toThousandths = (value) => {
+			const quantity = String(value ?? '').trim();
+
+			if (!/^\d{1,4}(?:\.\d{1,3})?$/.test(quantity)) {
+				return null;
+			}
+
+			const [whole, fraction = ''] = quantity.split('.');
+			const thousandths = (BigInt(whole) * 1000n) + BigInt(fraction.padEnd(3, '0'));
+
+			return thousandths > 0n && thousandths <= 1000000n ? thousandths : null;
+		};
+
+		const formatCents = (cents) => {
+			const absoluteCents = cents < 0n ? -cents : cents;
+
+			return `₱${absoluteCents / 100n}.${(absoluteCents % 100n).toString().padStart(2, '0')}`;
+		};
+
+		const itemRows = () => Array.from(itemList.querySelectorAll('[data-credit-item]'));
+		const selectedProductIds = () => new Set(itemRows().map((row) => row.dataset.productId));
+
+		const updateTotals = () => {
+			const rows = itemRows();
+			let subtotal = 0n;
+			let rowsWithoutPrice = 0;
+			let rowsWithInvalidQuantity = 0;
+
+			itemSummary.hidden = rows.length === 0;
+
+			rows.forEach((row) => {
+				const quantityInput = row.querySelector('[data-credit-item-quantity]');
+				const totalOutput = row.querySelector('[data-credit-item-total]');
+				const unitPrice = toCents(row.dataset.unitPrice);
+				const quantity = quantityInput instanceof HTMLInputElement ? toThousandths(quantityInput.value) : null;
+
+				if (quantityInput instanceof HTMLInputElement) {
+					quantityInput.setCustomValidity(quantity === null ? quantityMessage : '');
+				}
+
+				if (!(totalOutput instanceof HTMLElement)) {
+					return;
+				}
+
+				if (quantity === null) {
+					rowsWithInvalidQuantity += 1;
+					totalOutput.textContent = '—';
+				} else if (unitPrice === null) {
+					rowsWithoutPrice += 1;
+					totalOutput.textContent = 'No price';
+				} else {
+					const lineTotal = ((unitPrice * quantity) + 500n) / 1000n;
+					subtotal += lineTotal;
+					totalOutput.textContent = formatCents(lineTotal);
+				}
+			});
+
+			if (rowsWithInvalidQuantity > 0 || rowsWithoutPrice > 0) {
+				subtotalLabel.textContent = 'Item subtotal (incomplete)';
+				subtotalOutput.textContent = '—';
+				differenceOutput.textContent = rowsWithInvalidQuantity > 0
+					? 'Fix the highlighted quantities to see the item subtotal.'
+					: `${rowsWithoutPrice} ${rowsWithoutPrice === 1 ? 'product has' : 'products have'} no price, so there is no complete subtotal. The amount above is still what the customer owes.`;
+				return;
+			}
+
+			subtotalLabel.textContent = 'Item subtotal (reference)';
+			subtotalOutput.textContent = formatCents(subtotal);
+
+			const enteredAmount = amountInput instanceof HTMLInputElement ? toCents(amountInput.value) : null;
+
+			if (enteredAmount === null) {
+				differenceOutput.textContent = 'Enter the credit amount to compare it with the item subtotal.';
+			} else if (enteredAmount === subtotal) {
+				differenceOutput.textContent = 'The credit amount matches the item subtotal.';
+			} else {
+				const difference = enteredAmount - subtotal;
+				differenceOutput.textContent = `The credit amount is ${formatCents(difference)} ${difference > 0n ? 'more' : 'less'} than the item subtotal. The credit amount is what will be recorded.`;
+			}
+		};
+
+		const renderResults = (products) => {
+			const selectedIds = selectedProductIds();
+			lastResults = products;
+			productResults.replaceChildren();
+
+			products.forEach((product) => {
+				const resultItem = document.createElement('li');
+				const optionButton = document.createElement('button');
+				const nameLabel = document.createElement('span');
+				const priceLabel = document.createElement('span');
+				const isSelected = selectedIds.has(String(product.id));
+
+				optionButton.type = 'button';
+				optionButton.className = 'credit-product-option';
+				optionButton.disabled = isSelected;
+				nameLabel.textContent = product.name;
+				priceLabel.textContent = isSelected ? 'Added' : (product.unit_price === null ? 'No price' : `₱${product.unit_price}`);
+				optionButton.append(nameLabel, priceLabel);
+				optionButton.addEventListener('click', () => addProduct(product));
+				resultItem.append(optionButton);
+				productResults.append(resultItem);
+			});
+
+			productResults.hidden = products.length === 0;
+		};
+
+		function addProduct(product) {
+			if (selectedProductIds().has(String(product.id))) {
+				return;
+			}
+
+			const fragment = itemTemplate.content.cloneNode(true);
+			const row = fragment.querySelector('[data-credit-item]');
+
+			if (!(row instanceof HTMLElement)) {
+				return;
+			}
+
+			const index = String(nextIndex);
+			nextIndex += 1;
+			row.dataset.productId = String(product.id);
+			row.dataset.unitPrice = product.unit_price ?? '';
+			row.querySelectorAll('[name]').forEach((field) => {
+				field.setAttribute('name', (field.getAttribute('name') ?? '').replace('__INDEX__', index));
+			});
+
+			const productField = row.querySelector('[data-credit-item-product]');
+			const nameOutput = row.querySelector('[data-credit-item-name]');
+			const priceOutput = row.querySelector('[data-credit-item-price]');
+			const removeButton = row.querySelector('[data-credit-item-remove]');
+
+			if (productField instanceof HTMLInputElement) {
+				productField.value = String(product.id);
+			}
+
+			if (nameOutput instanceof HTMLElement) {
+				nameOutput.textContent = product.name;
+			}
+
+			if (priceOutput instanceof HTMLElement) {
+				priceOutput.textContent = product.unit_price === null ? 'No price set' : `₱${product.unit_price} each`;
+			}
+
+			removeButton?.setAttribute('aria-label', `Remove ${product.name}`);
+			itemList.append(fragment);
+			updateTotals();
+			renderResults(lastResults);
+			row.querySelector('[data-credit-item-quantity]')?.focus();
+		}
+
+		const searchProducts = async () => {
+			searchController?.abort();
+			searchController = new AbortController();
+			productStatus.textContent = 'Searching...';
+
+			try {
+				const searchUrl = new URL(creditProducts.dataset.searchUrl ?? '', window.location.origin);
+				const searchTerm = productSearch.value.trim();
+
+				if (searchTerm !== '') {
+					searchUrl.searchParams.set('search', searchTerm);
+				}
+
+				const response = await fetch(searchUrl, {
+					headers: {
+						Accept: 'application/json',
+						'X-Requested-With': 'XMLHttpRequest',
+					},
+					signal: searchController.signal,
+				});
+
+				if (!response.ok) {
+					throw new Error('Unable to load products.');
+				}
+
+				const { products } = await response.json();
+				renderResults(products);
+				productStatus.textContent = products.length === 0
+					? 'No active products match.'
+					: `${products.length} ${products.length === 1 ? 'product' : 'products'} shown`;
+			} catch (error) {
+				if (error instanceof DOMException && error.name === 'AbortError') {
+					return;
+				}
+
+				renderResults([]);
+				productStatus.textContent = 'Unable to load products. Try again.';
+			}
+		};
+
+		productSearch.addEventListener('input', () => {
+			clearTimeout(searchTimer);
+			searchTimer = setTimeout(searchProducts, 250);
+		});
+
+		productSearch.addEventListener('focus', () => {
+			if (lastResults.length === 0) {
+				searchProducts();
+			}
+		});
+
+		productSearch.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				clearTimeout(searchTimer);
+				searchProducts();
+			}
+		});
+
+		itemList.addEventListener('input', (event) => {
+			if (event.target instanceof HTMLElement && event.target.matches('[data-credit-item-quantity]')) {
+				updateTotals();
+			}
+		});
+
+		itemList.addEventListener('click', (event) => {
+			const removeButton = event.target instanceof HTMLElement ? event.target.closest('[data-credit-item-remove]') : null;
+
+			if (removeButton) {
+				removeButton.closest('[data-credit-item]')?.remove();
+				updateTotals();
+				renderResults(lastResults);
+			}
+		});
+
+		amountInput?.addEventListener('input', updateTotals);
+		updateTotals();
+	}
+}
+
 const paymentForm = document.querySelector('[data-payment-form]');
 
 if (paymentForm instanceof HTMLFormElement) {

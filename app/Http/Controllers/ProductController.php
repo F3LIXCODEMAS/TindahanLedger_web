@@ -26,10 +26,7 @@ class ProductController extends Controller
 
         $products = $request->user()->store->products()
             ->when($status !== '', fn (Builder $query) => $query->where('status', $status))
-            ->when($search !== '', fn (Builder $query) => $query->whereRaw(
-                "normalized_name like ? escape '!'",
-                ['%'.$this->escapeLikeWildcards(Product::normalizeName($search)).'%'],
-            ))
+            ->when($search !== '', fn (Builder $query) => $query->whereNameContains($search))
             ->orderBy('normalized_name')
             ->orderBy('id')
             ->paginate(20)
@@ -95,10 +92,5 @@ class ProductController extends Controller
     private function duplicateNameResponse(): RedirectResponse
     {
         return back()->withInput()->withErrors(['name' => SaveProductRequest::DUPLICATE_NAME_MESSAGE]);
-    }
-
-    private function escapeLikeWildcards(string $value): string
-    {
-        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value);
     }
 }

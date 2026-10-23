@@ -105,6 +105,29 @@ class LedgerEntry extends Model
         return $this->hasMany(EmailReminderLog::class);
     }
 
+    /** Structured purchase details recorded with this credit, if any. */
+    public function purchase(): HasOne
+    {
+        return $this->hasOne(Purchase::class);
+    }
+
+    /**
+     * Item lines for display: structured purchase items first, then the
+     * free-text items exactly as they were entered. Eager load
+     * `purchase.items` when listing several entries.
+     *
+     * @return list<string>
+     */
+    public function itemDescriptions(): array
+    {
+        $structuredItems = $this->purchase?->items
+            ->map(fn (PurchaseItem $item): string => $item->description())
+            ->all() ?? [];
+        $freeTextItems = array_map(static fn (mixed $item): string => (string) $item, $this->itemized_list ?? []);
+
+        return array_values([...$structuredItems, ...$freeTextItems]);
+    }
+
     public function getOutstandingBalanceAttribute(): string
     {
         $amountInCents = Money::toCents($this->amount);

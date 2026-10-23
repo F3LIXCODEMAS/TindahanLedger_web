@@ -116,7 +116,7 @@
                                     <section class="overdue-credit-entry" aria-label="Overdue credit entry">
                                         <div class="overdue-entry-heading">
                                             <div>
-                                                <h4>{{ count($entry->itemized_list ?? []) > 0 ? implode(', ', $entry->itemized_list) : 'Credit entry' }}</h4>
+                                                <h4>{{ count($entry->itemDescriptions()) > 0 ? implode(', ', $entry->itemDescriptions()) : 'Credit entry' }}</h4>
                                                 <p>Recorded {{ $entry->transaction_date->format('M j, Y') }} · ₱{{ $entry->amount }}</p>
                                                 @if ($entry->note)
                                                     <p>{{ $entry->note }}</p>

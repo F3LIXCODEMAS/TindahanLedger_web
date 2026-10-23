@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\ProductFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -67,6 +68,20 @@ class Product extends Model
                 'normalized_name' => self::normalizeName($value),
             ],
         );
+    }
+
+    /**
+     * Case-insensitive "name contains" search. Percent and underscore are
+     * matched literally; `!` is the escape character because MySQL, MariaDB,
+     * and SQLite all accept it.
+     *
+     * @param  Builder<Product>  $query
+     */
+    public function scopeWhereNameContains(Builder $query, string $search): void
+    {
+        $escapedSearch = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], self::normalizeName($search));
+
+        $query->whereRaw("normalized_name like ? escape '!'", ['%'.$escapedSearch.'%']);
     }
 
     public function store(): BelongsTo

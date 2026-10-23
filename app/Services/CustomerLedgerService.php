@@ -54,6 +54,7 @@ class CustomerLedgerService
     public function forCustomer(Customer $customer): array
     {
         $credits = $customer->ledgerEntries()
+            ->with('purchase.items')
             ->orderBy('transaction_date')
             ->orderBy('created_at')
             ->orderBy('id')
@@ -102,10 +103,7 @@ class CustomerLedgerService
                 'recorded_at' => $entry->created_at,
                 'amount_in_cents' => Money::toCents($entry->amount),
                 'note' => $entry->note,
-                'items' => array_values(array_map(
-                    static fn (mixed $item): string => (string) $item,
-                    $entry->itemized_list ?? [],
-                )),
+                'items' => $entry->itemDescriptions(),
                 'deadline' => $entry->repayment_deadline,
                 'remaining_amount_in_cents' => $remainingAmountInCents,
                 'is_overdue' => $isOverdue,

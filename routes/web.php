@@ -97,6 +97,8 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
 
     Route::get('/credits/customers/{customer}/summary', [CreditController::class, 'customerSummary'])
         ->name('credits.customer-summary');
+    Route::get('/credits/products', [CreditController::class, 'products'])
+        ->name('credits.products');
     Route::get('/credits/{ledgerEntry}/confirmation', [CreditController::class, 'confirmation'])
         ->name('credits.confirmation');
 
