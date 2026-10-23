@@ -62,7 +62,7 @@ class UserController extends Controller
         $owner = $userManagement->createStoreOwner($request->user(), $request->ownerDetails());
 
         return redirect()->route('admin.users.show', $owner)
-            ->with('status', 'Owner account created. Assign it to a store from the store details page.');
+            ->with('status', 'Owner account created. Create a store for this owner, or assign them to an existing store from its details page.');
     }
 
     public function show(Request $request, User $user): View

@@ -6,7 +6,9 @@ use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\StoreManagementService;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 it('forbids store owners from every store management action', function (string $method, Closure $url) {
     $owner = User::factory()->withStore()->create();
@@ -150,6 +152,103 @@ describe('creating a store', function () {
                 'temporary_password_confirmation' => 'different',
             ])
             ->assertInvalid(['store_name', 'name', 'email', 'temporary_password']);
+    });
+
+    it('creates a store for an existing owner without changing their account', function () {
+        $owner = User::factory()->create(['name' => 'Eman Ariza', 'username' => 'arizastore19']);
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $response = $this->actingAs($superAdmin)->post(route('admin.stores.store'), [
+            'store_name' => ' Ariza   Store ',
+            'owner_type' => 'existing',
+            'owner_user_id' => $owner->id,
+            'name' => 'Ignored Owner',
+            'email' => 'ignored@example.test',
+            'temporary_password' => 'temporary-pass-123',
+            'temporary_password_confirmation' => 'temporary-pass-123',
+        ]);
+
+        $store = Store::query()->sole();
+        $response->assertRedirect(route('admin.stores.show', $store))
+            ->assertSessionHas('status', 'Store created and assigned to Eman Ariza. They sign in with their existing username and password.');
+        expect($store->store_name)->toBe('Ariza Store');
+        expect($store->owner_user_id)->toBe($owner->id);
+        expect($store->isActive())->toBeTrue();
+        expect(User::query()->count())->toBe(2);
+        expect($owner->fresh())
+            ->username->toBe('arizastore19')
+            ->must_change_password->toBeFalse();
+        expect(Hash::check('password', $owner->fresh()->password))->toBeTrue();
+        expect(AdminAuditLog::query()->sole())
+            ->action->toBe(AdminAuditLog::ACTION_STORE_CREATED)
+            ->details->toBe(['store_name' => 'Ariza Store', 'owner_user_id' => $owner->id]);
+
+        $this->actingAs($owner)->get(route('dashboard'))->assertOk();
+    });
+
+    it('rejects an existing owner who cannot receive a store', function (Closure $makeCandidate) {
+        $candidate = $makeCandidate();
+        $storeCount = Store::query()->count();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->from(route('admin.stores.create'))
+            ->post(route('admin.stores.store'), [
+                'store_name' => 'Ariza Store',
+                'owner_type' => 'existing',
+                'owner_user_id' => $candidate->id,
+            ])
+            ->assertRedirect(route('admin.stores.create'))
+            ->assertInvalid(['owner_user_id' => 'Choose an active store owner account that is not assigned to another store.']);
+
+        expect(Store::query()->count())->toBe($storeCount);
+        expect(AdminAuditLog::query()->count())->toBe(0);
+    })->with([
+        'owner of another store' => fn () => User::factory()->withStore()->create(),
+        'deactivated owner' => fn () => User::factory()->inactive()->create(),
+        'super admin' => fn () => User::factory()->superAdmin()->create(),
+    ]);
+
+    it('requires an owner account when using an existing owner', function () {
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->post(route('admin.stores.store'), ['store_name' => 'Ariza Store', 'owner_type' => 'existing'])
+            ->assertInvalid(['owner_user_id' => 'Choose the owner account for this store.'])
+            ->assertValid(['name', 'email', 'temporary_password']);
+
+        expect(Store::query()->count())->toBe(0);
+    });
+
+    it('rejects an unknown owner type', function () {
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->post(route('admin.stores.store'), ['store_name' => 'Ariza Store', 'owner_type' => 'borrowed'])
+            ->assertInvalid(['owner_type' => 'Choose whether to create a new owner or use an existing one.']);
+
+        expect(Store::query()->count())->toBe(0);
+    });
+
+    it('refuses an owner who received a store after the form was validated', function () {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $owner = User::factory()->withStore()->create();
+
+        expect(fn () => app(StoreManagementService::class)->createStoreForExistingOwner($superAdmin, 'Second Store', $owner))
+            ->toThrow(ValidationException::class);
+
+        expect(Store::query()->count())->toBe(1);
+        expect(AdminAuditLog::query()->count())->toBe(0);
+    });
+
+    it('lists only owners without a store and preselects the requested owner', function () {
+        $waitingOwner = User::factory()->create(['name' => 'Waiting Owner']);
+        User::factory()->withStore()->create(['name' => 'Assigned Owner']);
+        User::factory()->inactive()->create(['name' => 'Deactivated Owner']);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('admin.stores.create', ['owner_user_id' => $waitingOwner->id]))
+            ->assertOk()
+            ->assertSee('Waiting Owner')
+            ->assertDontSee('Assigned Owner')
+            ->assertDontSee('Deactivated Owner')
+            ->assertSee('value="'.$waitingOwner->id.'" selected', escape: false)
+            ->assertSee('aria-controls="temporary_password"', escape: false);
     });
 });
 

@@ -115,6 +115,19 @@ it('issues a temporary password that the owner must replace', function () {
     expect(json_encode($auditLog->details))->not->toContain('temporary-pass-456');
 });
 
+it('links an active owner without a store to store creation', function () {
+    $waitingOwner = User::factory()->create();
+    $assignedOwner = User::factory()->withStore()->create();
+    $superAdmin = User::factory()->superAdmin()->create();
+    $createStoreUrl = fn (User $owner): string => route('admin.stores.create', ['owner_user_id' => $owner->id]);
+
+    $this->actingAs($superAdmin)->get(route('admin.users.show', $waitingOwner))
+        ->assertSee($createStoreUrl($waitingOwner), escape: false);
+
+    $this->get(route('admin.users.show', $assignedOwner))
+        ->assertDontSee('Create a store for this owner');
+});
+
 it('shows account details without the password', function () {
     $owner = User::factory()->withStore()->create(['username' => 'mang arthur store']);
 

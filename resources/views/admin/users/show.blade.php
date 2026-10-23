@@ -26,6 +26,9 @@
                         <a href="{{ route('admin.stores.show', $account->store) }}">{{ $account->store->store_name }}</a>
                     @else
                         Not assigned
+                        @if ($account->isStoreOwner() && $account->isActive())
+                            · <a href="{{ route('admin.stores.create', ['owner_user_id' => $account->id]) }}">Create a store for this owner</a>
+                        @endif
                     @endif
                 </dd>
             </div>

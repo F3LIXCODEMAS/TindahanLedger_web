@@ -41,6 +41,32 @@ class StoreManagementService
         });
     }
 
+    /**
+     * Create a store for an existing owner account that has no store yet.
+     * The owner keeps their current username and password. The owner row is
+     * locked so two concurrent requests cannot both give them a store.
+     */
+    public function createStoreForExistingOwner(User $actor, string $storeName, User $owner): Store
+    {
+        return DB::transaction(function () use ($actor, $storeName, $owner): Store {
+            $lockedOwner = User::query()->lockForUpdate()->findOrFail($owner->getKey());
+            $this->ensureOwnerIsAssignable($lockedOwner);
+
+            $store = new Store(['store_name' => $storeName]);
+            $store->forceFill([
+                'owner_user_id' => $lockedOwner->getKey(),
+                'status' => Store::STATUS_ACTIVE,
+            ])->save();
+
+            $this->auditLogger->record($actor, AdminAuditLog::ACTION_STORE_CREATED, $store, [
+                'store_name' => $store->store_name,
+                'owner_user_id' => $lockedOwner->getKey(),
+            ]);
+
+            return $store;
+        });
+    }
+
     public function updateDetails(User $actor, Store $store, string $storeName): void
     {
         DB::transaction(function () use ($actor, $store, $storeName): void {
@@ -94,13 +120,7 @@ class StoreManagementService
         DB::transaction(function () use ($actor, $store, $newOwner): void {
             $lockedStore = Store::query()->lockForUpdate()->findOrFail($store->getKey());
             $lockedOwner = User::query()->lockForUpdate()->findOrFail($newOwner->getKey());
-            $ownsAnotherStore = Store::query()->where('owner_user_id', $lockedOwner->getKey())->exists();
-
-            if (! $lockedOwner->isStoreOwner() || ! $lockedOwner->isActive() || $ownsAnotherStore) {
-                throw ValidationException::withMessages([
-                    'owner_user_id' => 'Choose an active store owner account that is not assigned to another store.',
-                ]);
-            }
+            $this->ensureOwnerIsAssignable($lockedOwner);
 
             $previousOwnerId = $lockedStore->owner_user_id;
             $lockedStore->forceFill(['owner_user_id' => $lockedOwner->getKey()])->save();
@@ -112,5 +132,20 @@ class StoreManagementService
                 'owner_user_id' => $lockedOwner->getKey(),
             ]);
         });
+    }
+
+    /**
+     * Only an active store-owner account without a store may receive one.
+     * Callers must hold a lock on the owner row.
+     */
+    private function ensureOwnerIsAssignable(User $lockedOwner): void
+    {
+        $ownsAnotherStore = Store::query()->where('owner_user_id', $lockedOwner->getKey())->exists();
+
+        if (! $lockedOwner->isStoreOwner() || ! $lockedOwner->isActive() || $ownsAnotherStore) {
+            throw ValidationException::withMessages([
+                'owner_user_id' => 'Choose an active store owner account that is not assigned to another store.',
+            ]);
+        }
     }
 }

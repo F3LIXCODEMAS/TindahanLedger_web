@@ -1,18 +1,51 @@
 import './bootstrap';
 
-const passwordToggle = document.querySelector('[data-password-toggle]');
 const passwordInput = document.querySelector('#password');
 
-if (passwordToggle instanceof HTMLButtonElement && passwordInput instanceof HTMLInputElement) {
-	passwordToggle.addEventListener('click', () => {
-		const isVisible = passwordInput.type === 'text';
+// Each show/hide button controls the password input named by its aria-controls.
+document.querySelectorAll('[data-password-toggle]').forEach((passwordToggle) => {
+	const controlledInput = document.getElementById(passwordToggle.getAttribute('aria-controls') ?? '');
 
-		passwordInput.type = isVisible ? 'password' : 'text';
+	if (!(passwordToggle instanceof HTMLButtonElement) || !(controlledInput instanceof HTMLInputElement)) {
+		return;
+	}
+
+	passwordToggle.addEventListener('click', () => {
+		const isVisible = controlledInput.type === 'text';
+
+		controlledInput.type = isVisible ? 'password' : 'text';
 		passwordToggle.textContent = isVisible ? 'Show' : 'Hide';
 		passwordToggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
 		passwordToggle.setAttribute('aria-pressed', String(!isVisible));
 	});
-}
+});
+
+// Create Store: show only the owner fields for the chosen owner type. A
+// disabled fieldset is neither validated by the browser nor submitted.
+const ownerTypeInputs = document.querySelectorAll('[data-owner-type]');
+const ownerSections = document.querySelectorAll('[data-owner-section]');
+
+ownerTypeInputs.forEach((ownerTypeInput) => {
+	if (!(ownerTypeInput instanceof HTMLInputElement)) {
+		return;
+	}
+
+	ownerTypeInput.addEventListener('change', () => {
+		if (!ownerTypeInput.checked) {
+			return;
+		}
+
+		ownerSections.forEach((ownerSection) => {
+			if (!(ownerSection instanceof HTMLFieldSetElement)) {
+				return;
+			}
+
+			const isChosen = ownerSection.dataset.ownerSection === ownerTypeInput.value;
+			ownerSection.hidden = !isChosen;
+			ownerSection.disabled = !isChosen;
+		});
+	});
+});
 
 const loginForm = document.querySelector('[data-login-form]');
 

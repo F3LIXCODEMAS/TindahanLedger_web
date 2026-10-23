@@ -8,7 +8,7 @@
     <header class="dashboard-heading">
         <p class="eyebrow">USER MANAGEMENT</p>
         <h1>Create Owner Account</h1>
-        <p>Use this to prepare a replacement owner. To register a new store with its owner, use <a href="{{ route('admin.stores.create') }}">Create store</a>.</p>
+        <p>Creates an owner account without a store. Afterwards, give it a new store from <a href="{{ route('admin.stores.create') }}">Create store</a> or hand it an existing store with Reassign owner on that store's page.</p>
     </header>
 
     <section class="admin-panel">

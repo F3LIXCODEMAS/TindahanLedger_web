@@ -15,6 +15,7 @@ use App\Services\PlatformMetricsService;
 use App\Services\StoreManagementService;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -73,13 +74,39 @@ class StoreController extends Controller
         ]);
     }
 
-    public function create(): View
+    /**
+     * `?owner_user_id=` preselects an existing owner, for example when
+     * arriving from that owner's account page.
+     */
+    public function create(Request $request): View
     {
-        return view('admin.stores.create');
+        $requestedOwnerId = old('owner_user_id', $request->query('owner_user_id'));
+        $ownerType = old('owner_type', $requestedOwnerId !== null
+            ? CreateStoreRequest::OWNER_TYPE_EXISTING
+            : CreateStoreRequest::OWNER_TYPE_NEW);
+        $availableOwners = $this->availableOwners();
+
+        if ($availableOwners->isEmpty()) {
+            $ownerType = CreateStoreRequest::OWNER_TYPE_NEW;
+        }
+
+        return view('admin.stores.create', [
+            'availableOwners' => $availableOwners,
+            'ownerType' => $ownerType,
+            'selectedOwnerId' => is_numeric($requestedOwnerId) ? (int) $requestedOwnerId : null,
+        ]);
     }
 
     public function store(CreateStoreRequest $request, StoreManagementService $storeManagement): RedirectResponse
     {
+        if ($request->usesExistingOwner()) {
+            $owner = User::query()->findOrFail($request->validated('owner_user_id'));
+            $store = $storeManagement->createStoreForExistingOwner($request->user(), $request->validated('store_name'), $owner);
+
+            return redirect()->route('admin.stores.show', $store)
+                ->with('status', "Store created and assigned to {$owner->name}. They sign in with their existing username and password.");
+        }
+
         $store = $storeManagement->createStoreWithOwner(
             $request->user(),
             $request->validated('store_name'),
@@ -124,12 +151,7 @@ class StoreController extends Controller
                 ->latest('id')
                 ->limit(20)
                 ->get(),
-            'availableOwners' => User::query()
-                ->where('role', User::ROLE_STORE_OWNER)
-                ->where('status', User::STATUS_ACTIVE)
-                ->whereDoesntHave('store')
-                ->orderBy('name')
-                ->get(['id', 'name', 'username']),
+            'availableOwners' => $this->availableOwners(),
         ]);
     }
 
@@ -143,6 +165,21 @@ class StoreController extends Controller
         $storeManagement->updateDetails($request->user(), $store, $request->validated('store_name'));
 
         return redirect()->route('admin.stores.show', $store)->with('status', 'Store details updated.');
+    }
+
+    /**
+     * Active store-owner accounts that do not own a store yet.
+     *
+     * @return EloquentCollection<int, User>
+     */
+    private function availableOwners(): EloquentCollection
+    {
+        return User::query()
+            ->where('role', User::ROLE_STORE_OWNER)
+            ->where('status', User::STATUS_ACTIVE)
+            ->whereDoesntHave('store')
+            ->orderBy('name')
+            ->get(['id', 'name', 'username']);
     }
 
     private function formatBalances(Store $store): void
