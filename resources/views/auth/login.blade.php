@@ -17,14 +17,14 @@
                 </a>
 
                 <div class="intro-copy">
-                    <p class="eyebrow intro-eyebrow">STORE OWNER ACCESS</p>
+                    <p class="eyebrow intro-eyebrow">Sign in to TindahanLedger</p>
                     <h1 id="brand-title">A clearer view of every balance.</h1>
                     <p>Keep customer credit, repayments, and daily ledger activity in one secure place.</p>
                 </div>
 
                 <div class="intro-footnote">
                     <span class="status-mark" aria-hidden="true"></span>
-                    <span>Private access for your store</span>
+                    <span>Private, secure access</span>
                 </div>
             </section>
 
@@ -49,7 +49,7 @@
                             autocomplete="username"
                             autocapitalize="none"
                             maxlength="120"
-                            placeholder="Your store name"
+                            placeholder="Enter your username"
                             required
                             autofocus
                             @if ($errors->has('username')) aria-invalid="true" @endif
@@ -97,7 +97,7 @@
                     </button>
                 </form>
 
-                <p class="form-footer">Your store information is available only to authorized owners.</p>
+                <p class="form-footer">Your information is available only to authorized users.</p>
             </section>
         </div>
     </main>
