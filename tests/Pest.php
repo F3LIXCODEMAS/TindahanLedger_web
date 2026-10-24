@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Product;
+use App\Models\Purchase;
+use App\Models\PurchaseItem;
+use App\Models\Store;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +48,32 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Record each list of products as one cash-sale basket in the store.
+ *
+ * @param  list<list<Product>>  $baskets
+ */
+function recordBaskets(Store $store, array $baskets): void
 {
-    // ..
+    foreach ($baskets as $products) {
+        $purchase = Purchase::factory()->cash()->create(['store_id' => $store->id]);
+
+        foreach ($products as $product) {
+            PurchaseItem::factory()->create(['purchase_id' => $purchase->id, 'product_id' => $product->id]);
+        }
+    }
+}
+
+/**
+ * Products A, B, and C in the store, with the four-basket fixture
+ * {A,B}, {A,B}, {A,C}, {B,C} recorded.
+ *
+ * @return array{0: Product, 1: Product, 2: Product}
+ */
+function recordFourBasketFixture(Store $store): array
+{
+    [$a, $b, $c] = Product::factory()->count(3)->for($store)->create()->all();
+    recordBaskets($store, [[$a, $b], [$a, $b], [$a, $c], [$b, $c]]);
+
+    return [$a, $b, $c];
 }

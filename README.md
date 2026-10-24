@@ -157,3 +157,112 @@ The report also includes an independence check: the lift of every product pair t
 ### Not yet implemented
 
 Importing external baskets is intentionally not built. Before it is, a dataset must have a known source and license, pass validation, and pass a suitability review. The import must then keep external baskets in their own storage, separate from store purchase history; track the checksum to refuse a second import of the same file; and never replace a working model with a failed or partial run.
+
+
+## Association rule engine (DUMS-39)
+
+The engine finds products that are often bought together and saves them as versioned rules for later product recommendations.
+
+### Scope of this version
+
+It produces **single-item rules only**: `Product A → Product B`, where each side is exactly one product. It counts how often each product and each pair of products appear in the same basket, then calculates support, confidence, and lift for both directions of every pair. This is the pair-counting first stage of association rule mining, **not** the full iterative Apriori search: rules such as `A + B → C` are not generated. The command is named `apriori:train` for continuity with the project plan.
+
+### Training data and eligibility
+
+A basket is one purchase from the DUMS-36/37 tables (`purchases` and `purchase_items`). Training reads only purchase and product IDs, never customer details.
+
+| Included | Excluded |
+|---|---|
+| Utang credits with their ledger entry (DUMS-36) | Payments, including cash payments on a debt: they are repayments, not purchases |
+| Cash sales (DUMS-37) | Utang purchases without a ledger entry (incomplete), and unknown purchase types |
+| Items whose product belongs to the same store's catalog, including products later made inactive | Items whose product cannot be resolved, and items with zero quantity |
+| Purchases already committed when counting starts | Purchases committed by other requests while counting runs |
+| Single-item baskets, which count toward N but form no pair | Purchases with no eligible items |
+
+All counts are read in one database transaction (REPEATABLE READ on MySQL/MariaDB), so N, the product counts, and the pair counts come from the same snapshot. The newest purchase ID in that snapshot is saved on the rule set as `source_cutoff_purchase_id`. The snapshot guarantee relies on the database's transaction isolation; it was reasoned from MariaDB's documented behaviour, not reproduced with concurrent writers.
+
+The schema has no draft, cancelled, or voided purchase states, so none can be filtered. Each product counts once per basket whatever its quantity, and the database already forbids listing a product twice in one purchase.
+
+### Metrics
+
+With N = eligible baskets, count(A) = baskets containing A, and count(A,B) = baskets containing both:
+
+- support(A → B) = count(A,B) / N
+- confidence(A → B) = count(A,B) / count(A)
+- lift(A → B) = count(A,B) × N / (count(A) × count(B))
+
+Lift above 1 means the products appear together more often than chance in the observed data, 1 means independence, and below 1 means a negative association. Association does not prove causation or guarantee extra sales.
+
+All calculations use exact integer arithmetic. Stored values are rounded half-up to six decimals, and thresholds are compared against the exact, unrounded ratio. Every rule stores the counts behind its metrics so it can be audited. One run supports up to 1,000,000 eligible baskets.
+
+Check with the fixture {A,B}, {A,B}, {A,C}, {B,C}: N = 4, count(A) = count(B) = 3, count(A,B) = 2, so A → B has support 0.500000, confidence 0.666667, and lift 0.888889. On the arules Groceries data (9,835 baskets) at support 1% and confidence 30%, the engine produces the same 69 single-item rules, with identical values, as a separate Python pipeline written for the DUMS-39 category-mapping experiment. Both were written in the same project, so this is a cross-check between two implementations, not an independent validation; the results have not been compared against the arules package itself.
+
+### Thresholds
+
+Defaults live in `config/association_rules.php` and can be set in `.env` or overridden per run. They are starting values for experiments, not proven settings.
+
+| Setting | Default | `.env` | Command option |
+|---|---|---|---|
+| Minimum support | 0.01 | `ASSOCIATION_MIN_SUPPORT` | `--min-support` |
+| Minimum confidence | 0.30 | `ASSOCIATION_MIN_CONFIDENCE` | `--min-confidence` |
+| Minimum lift (`off` disables it) | 1.0 | `ASSOCIATION_MIN_LIFT` | `--min-lift` |
+| Minimum eligible baskets | 100 | `ASSOCIATION_MIN_BASKETS` | `--min-baskets` |
+| Minimum baskets with the antecedent | 5 | `ASSOCIATION_MIN_ANTECEDENT_COUNT` | `--min-antecedent` |
+| Minimum baskets with both products | 3 | `ASSOCIATION_MIN_PAIR_COUNT` | `--min-pair` |
+
+Every comparison is inclusive: a value equal to its threshold passes. Support and confidence must be between 0 and 1, lift between 0 and 1000, each with at most six decimals. Counts must be whole numbers from 1 to 1,000,000. Invalid values stop the command before anything runs.
+
+A scope with fewer eligible baskets than the minimum is recorded as `insufficient_data`, and nothing is published. Thresholds are never lowered automatically. When this section was written, the development database held 6 baskets in one store, so training there correctly reports insufficient data.
+
+### Commands
+
+```powershell
+php artisan apriori:train --store=1 --dry-run   # calculate and print the top rules; saves nothing
+php artisan apriori:train --store=1             # train, validate, and activate store 1's model
+php artisan apriori:train --all-stores          # train every active store, each separately
+php artisan apriori:train --source=external --dataset=path/to/baskets.csv --dry-run
+php artisan apriori:train --store=1 --min-support=0.02 --min-lift=off
+```
+
+A scope is always required. Stores are never combined into one model. A dry run calculates the full metrics and prints up to 10 rules, but writes nothing to the database.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Every scope finished: activated, validated (external), recorded as insufficient data, or dry run |
+| 1 | A scope failed, or another run of the same scope was in progress |
+| 2 | Invalid options or thresholds |
+
+### Rule-set lifecycle
+
+Each run creates a row in `rule_sets`, and its rules go into `association_rules`.
+
+1. **`building`**: the run starts. The active version is not touched.
+2. Below the minimum basket count, the run becomes **`insufficient_data`**.
+3. Otherwise the rules are generated and saved in one transaction. Every saved rule is then checked again: scope, no self-rule, counts against the basket counts, metrics recomputed from the counts, and thresholds. The run becomes **`validated`**.
+4. Store runs are activated in one locked transaction. The old version becomes **`superseded`** and the new one **`active`**.
+5. Any failure marks the run **`failed`**, with a reason that never contains customer data. The previous active version stays active.
+
+At most one version per scope can be active, enforced by a unique `active_scope_key` column. Old versions are kept for auditing and rollback; nothing deletes rule sets or rules, and the foreign keys forbid deleting a product that appears in a rule. When a run with enough baskets finds no rule that meets the thresholds, a version with zero rules is activated, because the newest evidence replaces older rules.
+
+Only one run per scope can train at a time. A cache lock per scope enforces this (`ASSOCIATION_TRAINING_LOCK_SECONDS`, default 1800) and expires on its own if a process crashes. A later run marks any rule set left in `building` as failed (abandoned). A run leaves `building` only while its status is still `building`, so a run that outlived its lock and was marked abandoned fails instead of being validated or activated. Different stores can train at the same time.
+
+### Store isolation and external experiments
+
+- Every query filters by store. Composite foreign keys tie each rule, its rule set, and both products to the same store.
+- `App\Services\ProductRecommendationService::forProduct($store, $product)` reads only that store's active version. It returns nothing for another store's product and skips products that are inactive in the catalog. Results are ordered by confidence, then lift, then co-occurrence count.
+- **External experiments** (`--source=external`) use a basket CSV validated by the DUMS-38 rules. They are saved with scope `external_experiment`, no store, and normalized labels instead of products, so nothing enters a store catalog. They are never activated and never returned as recommendations.
+- **The arules Groceries rules describe a European supermarket dataset. They are not verified Philippine sari-sari buying patterns, and the dataset's license is unverified.**
+
+### Known limitations
+
+- Single-item rules only; no multi-item antecedents or consequents.
+- The schema has no cancelled or voided purchases. If such states are added, the eligibility query must exclude them.
+- Pairs that meet the minimum co-occurrence count are loaded into memory, which suits sari-sari catalog sizes; very large catalogs may need streaming.
+- Small stores will rarely reach 100 eligible baskets; the thresholds need tuning against real store data.
+- No owner dashboard or customer-facing UI uses the rules yet.
+
+### Tests
+
+```powershell
+php artisan test --compact tests/Unit/Support/AssociationMetricsTest.php tests/Unit/Services/AssociationRuleGeneratorTest.php tests/Feature/AssociationRuleTrainingTest.php tests/Feature/TrainAssociationRulesCommandTest.php tests/Feature/ProductRecommendationServiceTest.php
+```

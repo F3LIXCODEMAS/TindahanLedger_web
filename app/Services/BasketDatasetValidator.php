@@ -51,6 +51,18 @@ class BasketDatasetValidator
      */
     public function validate(string $path): array
     {
+        return $this->validateWithBaskets($path)['report'];
+    }
+
+    /**
+     * The same validation, also returning the accepted baskets (normalized
+     * labels, each label once per basket) for association rule experiments
+     * (DUMS-39). Baskets are empty when the file cannot be validated.
+     *
+     * @return array{report: array<string, mixed>, baskets: list<list<string>>}
+     */
+    public function validateWithBaskets(string $path): array
+    {
         $report = [
             'file' => ['path' => $path],
             'file_errors' => [],
@@ -59,7 +71,7 @@ class BasketDatasetValidator
         if (! is_file($path) || ! is_readable($path)) {
             $report['file_errors'][] = 'The file does not exist or cannot be read.';
 
-            return $report;
+            return ['report' => $report, 'baskets' => []];
         }
 
         $report['file'] += [
@@ -81,7 +93,7 @@ class BasketDatasetValidator
             fclose($handle);
             $report['file_errors'][] = 'The file is empty.';
 
-            return $report;
+            return ['report' => $report, 'baskets' => []];
         }
 
         $report['format'] = [
@@ -95,13 +107,15 @@ class BasketDatasetValidator
             fclose($handle);
             $report['file_errors'][] = 'Unexpected header. Expected exactly: '.implode(',', self::EXPECTED_HEADER).'.';
 
-            return $report;
+            return ['report' => $report, 'baskets' => []];
         }
 
         $result = $this->validateRows($handle);
         fclose($handle);
+        $baskets = $result['accepted_baskets'];
+        unset($result['accepted_baskets']);
 
-        return $report + $result;
+        return ['report' => $report + $result, 'baskets' => $baskets];
     }
 
     /**
@@ -219,6 +233,7 @@ class BasketDatasetValidator
             'baskets' => $this->basketStatistics($acceptedBaskets),
             'labels' => $this->labelStatistics($acceptedBaskets, $originalSpellings),
             'suitability_signals' => $this->pairStatistics($acceptedBaskets),
+            'accepted_baskets' => $acceptedBaskets,
         ];
     }
 
