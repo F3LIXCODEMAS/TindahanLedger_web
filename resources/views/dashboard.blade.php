@@ -17,6 +17,7 @@
             <a class="owner-nav-link is-current" href="{{ route('dashboard') }}" aria-current="page">Dashboard</a>
             <a class="owner-nav-link" href="{{ route('overdue-accounts.index') }}">Overdue accounts</a>
             <a class="owner-nav-link" href="{{ route('products.index') }}">Products</a>
+            <a class="owner-nav-link" href="{{ route('purchase-analytics.index') }}">Purchase analytics</a>
             <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
             <a class="owner-nav-link" href="{{ route('late-penalties.edit') }}">Late payment policy</a>
             <a class="owner-nav-link" href="{{ route('password.edit') }}">Change password</a>

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Purchase;
 use App\Support\BasketCounts;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,12 @@ class PurchaseBasketCounter
         });
     }
 
-    private function countUpTo(int $storeId, int $cutoffPurchaseId, int $minPairCount): BasketCounts
+    /**
+     * Counts for the store's eligible baskets with purchase ID up to the
+     * cutoff. Used to re-check a rule set against the baskets it was trained
+     * on (its `source_cutoff_purchase_id`).
+     */
+    public function countUpTo(int $storeId, int $cutoffPurchaseId, int $minPairCount): BasketCounts
     {
         $eligible = $this->eligibleItems($storeId, $cutoffPurchaseId)
             ->select('purchase_items.purchase_id', 'purchase_items.product_id')
@@ -89,7 +95,13 @@ class PurchaseBasketCounter
         return new BasketCounts((int) $basketCount, $itemCounts, $pairCounts);
     }
 
-    private function eligibleItems(int $storeId, int $cutoffPurchaseId): Builder
+    /**
+     * The eligible purchase items of one store: the single definition of
+     * basket eligibility, shared by training, analytics, and evaluation
+     * (DUMS-41). A null cutoff includes every purchase; the optional
+     * `purchase_date` range (Y-m-d, inclusive) limits a reporting period.
+     */
+    public function eligibleItems(int $storeId, ?int $cutoffPurchaseId = null, ?string $fromDate = null, ?string $toDate = null): Builder
     {
         return DB::table('purchase_items')
             ->join('purchases', function (JoinClause $join): void {
@@ -102,7 +114,9 @@ class PurchaseBasketCounter
             })
             ->where('purchase_items.store_id', $storeId)
             ->where('purchases.store_id', $storeId)
-            ->where('purchases.id', '<=', $cutoffPurchaseId)
+            ->when($cutoffPurchaseId !== null, fn (Builder $query) => $query->where('purchases.id', '<=', $cutoffPurchaseId))
+            ->when($fromDate !== null, fn (Builder $query) => $query->where('purchases.purchase_date', '>=', $fromDate))
+            ->when($toDate !== null, fn (Builder $query) => $query->where('purchases.purchase_date', '<', CarbonImmutable::parse($toDate)->addDay()->toDateString()))
             ->where('purchase_items.quantity', '>', 0)
             ->where(function (Builder $query): void {
                 $query->where(function (Builder $utang): void {

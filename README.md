@@ -336,3 +336,94 @@ php artisan test --compact tests/Feature/ProductRecommendationEndpointTest.php t
 The project has no browser test runner, so the panel's JavaScript (debouncing, stale-response handling, the Add button, and failure messages) is not covered by automated tests and was checked by reading the code. The tests cover the endpoint, the ranking, store isolation, read-only behaviour, the panel on both pages, and that recording a transaction does not depend on suggestions.
 
 The fixtures are synthetic. Neither they nor the external Groceries experiments describe real Philippine sari-sari buying behaviour.
+
+## Purchase analytics and recommendation evaluation (DUMS-41)
+
+Store owners can open **Purchase analytics** (`GET /analytics/purchases`, route `purchase-analytics.index`, linked from the dashboard). The page shows what recorded sales contain, how the suggestion model was built, how its rules hold up, and an optional offline test of the suggestions. It is read-only. It never trains or activates a model and never changes debts, payments, balances, or the dashboard figures.
+
+### Access and privacy
+
+- Signed-in store owners only (`auth`, `password.changed`, `role:store_owner`). Guests are sent to the login page and Super Admins get 403, as with other owner pages. No cross-store view was added.
+- The store comes from the signed-in owner. Store IDs in the URL are ignored.
+- Only product and basket aggregates are read. No customer names, contacts, or purchase histories appear.
+
+### Reporting period
+
+`from` and `to` (Y-m-d, inclusive, application timezone) filter by `purchase_date`. The default is the last 90 days and the longest period is two years. An end date before the start date is rejected.
+
+### Purchase figures
+
+Every figure uses `PurchaseBasketCounter::eligibleItems()`, the same eligibility rules the engine trains on. Cash and utang counts come from the stored `purchase_type`; repayments are never purchases.
+
+| Figure | Definition |
+|---|---|
+| Purchase baskets | Distinct eligible purchases in the period |
+| Products sold | Distinct products in those baskets |
+| Product baskets | Distinct baskets containing the product (top 10) |
+| Share of baskets | Product baskets ÷ purchase baskets |
+| Total quantity | Sum of the product's recorded quantities |
+| Pair count and support | Baskets containing both products, and that count ÷ purchase baskets (top 10, only pairs seen in at least the configured minimum co-occurrence) |
+
+A pair's confidence and lift are shown only when the active model has a rule for it, labelled as model values from the model's own training baskets.
+
+### Suggestion model
+
+The model section reads persisted rule-set data only: status, training time (`completed_at`), activation time, baskets used for training, and active rule count. It also shows the configured thresholds, and notes if they changed after training. Models are store-specific: `ProductRecommendationService` reads only the store's active rule set and has **no global fallback**. External experiment rule sets are never activated or shown. Without an active model, the page shows the latest run's status, such as "not enough data" with its basket count.
+
+### Rule checks
+
+`AssociationRuleDiagnosticsService` recalculates every active rule from the baskets the model was trained on (purchase IDs up to the rule set's cutoff) with the engine's formulas, and compares the result with the stored counts and metrics. Each rule gets one category, most serious first:
+
+1. Does not match current records
+2. Insufficient observations (below the configured minimum co-occurrence or first-product baskets)
+3. Low support
+4. Low confidence
+5. Weak or non-positive association (below the configured minimum lift; with the lift filter off, lift of 1 or less)
+6. Meets configured thresholds
+
+Categories use the currently configured thresholds. A "few observations" note marks rules resting on fewer than 10 baskets; it is a reading aid, not a validated threshold, and does not change the category. Meeting the thresholds does not prove a rule is useful in practice.
+
+### Offline evaluation
+
+The evaluation runs only on request (the page's "Run offline evaluation" button, or the command below). It uses the selected period and never touches the live model.
+
+1. Eligible baskets are ordered by purchase date, then purchase ID.
+2. **Training**: the earliest 70% (configurable from 10 to 90 in the command), extended to the end of the boundary day so no day is split. **Held-out**: later days.
+3. Rules are generated from training baskets only, in memory, by the engine's own generator with the configured thresholds. The **popularity baseline** ranks products by how many training baskets contain them, ties going to the lower product ID.
+4. Every held-out basket with at least two distinct products is evaluated. Its last-entered product (highest purchase-item ID) is hidden, and the other products are the input.
+5. Each method suggests up to **K = 3** products, the live picker's limit, never suggesting input products or products now inactive. Rule suggestions are ranked exactly as in the picker: strongest rule per candidate by confidence, lift, and co-occurrence, then lower IDs.
+
+With n evaluated baskets, the same for both methods:
+
+| Metric | Formula |
+|---|---|
+| Coverage | baskets with at least one suggestion ÷ n |
+| Hit rate@3 | baskets whose hidden product was suggested ÷ n; a basket without suggestions is a miss |
+| Precision@3 | hits ÷ (3 × n) |
+| Recall@3 | hidden products found ÷ n; equal to the hit rate, since one product is hidden per basket |
+
+The evaluation is reported as unavailable, with the reasons, when:
+
+- the period has no eligible baskets or more than 20,000;
+- the training portion has fewer baskets than the engine's minimum (default 100);
+- no later day remains after the split;
+- fewer than 20 held-out baskets have two or more products.
+
+Results from fewer than 100 evaluated baskets are labelled exploratory. Results describe recorded sales only, not effects on sales, profit, or customer behaviour.
+
+```powershell
+php artisan apriori:evaluate --store=1 --from=2026-07-01 --to=2026-10-24 --train-percent=70
+```
+
+The command exits with 0 when the evaluation ran, 1 when it was unavailable for the data, and 2 for invalid options.
+
+### Checks and measurements
+
+- **MariaDB 10.4:** every new query was run on factory data (12 products, 400 cash baskets over 100 days) inside a transaction that was rolled back. On that run the summary took 41.5 ms, the rule checks 24 ms, and the evaluation 15.3 ms. The eligibility query uses the existing store and product indexes. These are single local timings, not a performance guarantee.
+- **Synthetic data:** on the isolated synthetic Mang Arthur Store data (301 baskets), the evaluation ran on 75 baskets, so it is labelled exploratory. There, the popularity baseline scored a higher hit rate@3 than the rules: 9.3% against 5.3%. That data is synthetic and says nothing about real sari-sari customers.
+
+### Tests
+
+```powershell
+php artisan test --compact tests/Feature/PurchaseAnalyticsTest.php tests/Feature/RecommendationEvaluationTest.php
+```

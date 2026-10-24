@@ -26,6 +26,7 @@ use App\Http\Controllers\Portal\PortalAccessController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductRecommendationController;
 use App\Http\Controllers\ProductStatusController;
+use App\Http\Controllers\PurchaseAnalyticsController;
 use App\Http\Controllers\StoreEmailSettingsController;
 use App\Http\Controllers\SukiPointRedemptionController;
 use App\Models\User;
@@ -84,6 +85,7 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_SUPER_ADMIN])
 Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/overdue-accounts', OverdueAccountController::class)->name('overdue-accounts.index');
+    Route::get('/analytics/purchases', PurchaseAnalyticsController::class)->name('purchase-analytics.index');
 
     Route::get('/settings/email-notifications', [StoreEmailSettingsController::class, 'edit'])
         ->name('email-settings.edit');
