@@ -2189,6 +2189,94 @@ body.owner-auth-page {
     cursor: pointer;
 }
 
+.credit-recommendations {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+    padding: 10px;
+    border: 1px dashed var(--color-ledger-line);
+    border-radius: 5px;
+    background: #fff;
+}
+
+.credit-recommendations[hidden],
+.credit-recommendation-list[hidden] {
+    display: none;
+}
+
+.credit-recommendations h3 {
+    margin: 0;
+    color: var(--color-ledger-ink);
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.credit-recommendations-note {
+    margin: 0;
+    color: var(--color-ledger-muted);
+    font-size: 11px;
+}
+
+.credit-recommendation-list {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.credit-recommendation {
+    display: flex;
+    flex-wrap: wrap;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-ledger-line);
+    border-radius: 5px;
+}
+
+.credit-recommendation-text {
+    display: grid;
+    flex: 1 1 160px;
+    min-width: 0;
+    gap: 2px;
+}
+
+.credit-recommendation-text strong {
+    color: var(--color-ledger-ink);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.credit-recommendation-text span {
+    color: var(--color-ledger-muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.credit-recommendation-add {
+    flex: none;
+    min-height: 38px;
+    padding: 6px 14px;
+    border: 1px solid var(--color-ledger-green);
+    border-radius: 5px;
+    color: var(--color-ledger-green);
+    background: #fff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.credit-recommendation-add:hover {
+    color: #fff;
+    background: var(--color-ledger-green);
+}
+
+.credit-recommendation-add:focus-visible,
 .credit-item-remove:focus-visible,
 .credit-product-option:focus-visible {
     outline: 3px solid var(--color-ledger-gold);

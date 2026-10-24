@@ -297,6 +297,129 @@ if (creditProducts instanceof HTMLElement) {
 		const itemRows = () => Array.from(itemList.querySelectorAll('[data-credit-item]'));
 		const selectedProductIds = () => new Set(itemRows().map((row) => row.dataset.productId));
 
+		// Optional "often bought together" suggestions (DUMS-40). They never block entry:
+		// failures only show a message, and Add uses the normal addProduct() path.
+		const recommendationPanel = creditProducts.querySelector('[data-credit-recommendations]');
+		const recommendationStatus = creditProducts.querySelector('[data-credit-recommendation-status]');
+		const recommendationList = creditProducts.querySelector('[data-credit-recommendation-list]');
+		const recommendationMessages = {
+			no_active_model: 'Suggestions appear once this store has recorded enough sales.',
+			no_matches: 'No suggestions for these products yet.',
+			failed: 'Suggestions are unavailable right now. You can keep adding products as usual.',
+		};
+		let recommendationTimer;
+		let recommendationController;
+		let recommendationRequest = 0;
+		let lastRecommendationKey = null;
+
+		const renderRecommendations = (recommendations) => {
+			if (!(recommendationList instanceof HTMLElement)) {
+				return;
+			}
+
+			recommendationList.replaceChildren();
+
+			recommendations.slice(0, 3).forEach((product) => {
+				const item = document.createElement('li');
+				const text = document.createElement('div');
+				const name = document.createElement('strong');
+				const explanation = document.createElement('span');
+				const addButton = document.createElement('button');
+
+				item.className = 'credit-recommendation';
+				text.className = 'credit-recommendation-text';
+				name.textContent = product.name;
+				explanation.textContent = product.explanation;
+				addButton.type = 'button';
+				addButton.className = 'credit-recommendation-add';
+				addButton.textContent = 'Add';
+				addButton.setAttribute('aria-label', `Add ${product.name}`);
+				addButton.addEventListener('click', () => addProduct({ id: product.id, name: product.name, unit_price: product.unit_price }));
+				text.append(name, explanation);
+				item.append(text, addButton);
+				recommendationList.append(item);
+			});
+
+			recommendationList.hidden = recommendations.length === 0;
+		};
+
+		const loadRecommendations = async () => {
+			if (!(recommendationPanel instanceof HTMLElement) || !(recommendationStatus instanceof HTMLElement)) {
+				return;
+			}
+
+			const productIds = Array.from(selectedProductIds())
+				.filter((id) => /^\d+$/.test(id ?? ''))
+				.sort((left, right) => Number(left) - Number(right));
+			const basketKey = productIds.join(',');
+
+			if (basketKey === lastRecommendationKey) {
+				return;
+			}
+
+			lastRecommendationKey = basketKey;
+			recommendationController?.abort();
+			const request = ++recommendationRequest;
+
+			if (productIds.length === 0) {
+				recommendationPanel.hidden = true;
+				recommendationPanel.removeAttribute('aria-busy');
+				recommendationStatus.textContent = '';
+				renderRecommendations([]);
+				return;
+			}
+
+			recommendationController = new AbortController();
+			recommendationPanel.hidden = false;
+			recommendationPanel.setAttribute('aria-busy', 'true');
+			recommendationStatus.textContent = 'Loading suggestions...';
+
+			try {
+				const recommendationsUrl = new URL(recommendationPanel.dataset.recommendationsUrl ?? '', window.location.origin);
+				productIds.forEach((id) => recommendationsUrl.searchParams.append('product_ids[]', id));
+
+				const response = await fetch(recommendationsUrl, {
+					headers: {
+						Accept: 'application/json',
+						'X-Requested-With': 'XMLHttpRequest',
+					},
+					signal: recommendationController.signal,
+				});
+
+				if (!response.ok) {
+					throw new Error('Unable to load suggestions.');
+				}
+
+				const { status, recommendations } = await response.json();
+
+				if (request !== recommendationRequest) {
+					return;
+				}
+
+				const currentIds = selectedProductIds();
+				const shown = (Array.isArray(recommendations) ? recommendations : []).filter((product) => !currentIds.has(String(product.id)));
+				renderRecommendations(shown);
+				recommendationStatus.textContent = shown.length > 0 ? '' : (recommendationMessages[status] ?? recommendationMessages.no_matches);
+			} catch (error) {
+				if ((error instanceof DOMException && error.name === 'AbortError') || request !== recommendationRequest) {
+					return;
+				}
+
+				lastRecommendationKey = null;
+				renderRecommendations([]);
+				recommendationStatus.textContent = recommendationMessages.failed;
+			} finally {
+				if (request === recommendationRequest) {
+					recommendationPanel.removeAttribute('aria-busy');
+				}
+			}
+		};
+
+		const scheduleRecommendations = () => {
+			clearTimeout(recommendationTimer);
+			recommendationTimer = setTimeout(loadRecommendations, 300);
+		};
+
 		const setExpectedTotal = (value) => {
 			if (expectedTotalInput instanceof HTMLInputElement) {
 				expectedTotalInput.value = value;
@@ -461,6 +584,7 @@ if (creditProducts instanceof HTMLElement) {
 			itemList.append(fragment);
 			updateTotals();
 			renderResults(lastResults);
+			scheduleRecommendations();
 			row.querySelector('[data-credit-item-quantity]')?.focus();
 		}
 
@@ -536,11 +660,13 @@ if (creditProducts instanceof HTMLElement) {
 				removeButton.closest('[data-credit-item]')?.remove();
 				updateTotals();
 				renderResults(lastResults);
+				scheduleRecommendations();
 			}
 		});
 
 		amountInput?.addEventListener('input', updateTotals);
 		updateTotals();
+		loadRecommendations();
 	}
 }
 

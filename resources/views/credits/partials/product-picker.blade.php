@@ -36,6 +36,14 @@
         @endforeach
     </ul>
 
+    {{-- Optional suggestions from this store's active association rules (DUMS-40). Adding one only adds a product row; nothing is submitted. --}}
+    <section class="credit-recommendations" aria-labelledby="credit-recommendations-title" data-credit-recommendations data-recommendations-url="{{ route('credits.product-recommendations') }}" hidden>
+        <h3 id="credit-recommendations-title">Often bought together</h3>
+        <p class="credit-recommendations-note">Optional suggestions based on this store's recorded sales.</p>
+        <p class="credit-search-status" aria-live="polite" data-credit-recommendation-status></p>
+        <ul class="credit-recommendation-list" data-credit-recommendation-list hidden></ul>
+    </section>
+
     <template data-credit-item-template>
         @include('credits.partials.item-row', ['index' => '__INDEX__', 'item' => null, 'priceEditable' => $isCashSale])
     </template>

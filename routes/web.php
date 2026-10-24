@@ -24,6 +24,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\Portal\PortalAccessController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductRecommendationController;
 use App\Http\Controllers\ProductStatusController;
 use App\Http\Controllers\StoreEmailSettingsController;
 use App\Http\Controllers\SukiPointRedemptionController;
@@ -100,6 +101,8 @@ Route::middleware(['auth', 'password.changed', 'role:'.User::ROLE_STORE_OWNER])-
         ->name('credits.customer-summary');
     Route::get('/credits/products', [CreditController::class, 'products'])
         ->name('credits.products');
+    Route::get('/credits/product-recommendations', ProductRecommendationController::class)
+        ->name('credits.product-recommendations');
     Route::get('/credits/{ledgerEntry}/confirmation', [CreditController::class, 'confirmation'])
         ->name('credits.confirmation');
 

@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\AssociationRule;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\RuleSet;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -76,4 +78,26 @@ function recordFourBasketFixture(Store $store): array
     recordBaskets($store, [[$a, $b], [$a, $b], [$a, $c], [$b, $c]]);
 
     return [$a, $b, $c];
+}
+
+/**
+ * An active rule set for the store holding one rule per [antecedent,
+ * consequent, attribute overrides] entry.
+ *
+ * @param  list<array{0: Product, 1: Product, 2?: array<string, mixed>}>  $rules
+ */
+function publishRules(Store $store, array $rules): RuleSet
+{
+    $ruleSet = RuleSet::factory()->active()->create(['store_id' => $store->id]);
+
+    foreach ($rules as $rule) {
+        AssociationRule::factory()->create([
+            'rule_set_id' => $ruleSet->id,
+            'antecedent_product_id' => $rule[0]->id,
+            'consequent_product_id' => $rule[1]->id,
+            ...($rule[2] ?? []),
+        ]);
+    }
+
+    return $ruleSet;
 }

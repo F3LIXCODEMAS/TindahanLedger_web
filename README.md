@@ -259,10 +259,80 @@ Only one run per scope can train at a time. A cache lock per scope enforces this
 - The schema has no cancelled or voided purchases. If such states are added, the eligibility query must exclude them.
 - Pairs that meet the minimum co-occurrence count are loaded into memory, which suits sari-sari catalog sizes; very large catalogs may need streaming.
 - Small stores will rarely reach 100 eligible baskets; the thresholds need tuning against real store data.
-- No owner dashboard or customer-facing UI uses the rules yet.
+- The rules are used only for the transaction-entry suggestions (DUMS-40, below); there is no dashboard view or customer-facing use.
 
 ### Tests
 
 ```powershell
 php artisan test --compact tests/Unit/Support/AssociationMetricsTest.php tests/Unit/Services/AssociationRuleGeneratorTest.php tests/Feature/AssociationRuleTrainingTest.php tests/Feature/TrainAssociationRulesCommandTest.php tests/Feature/ProductRecommendationServiceTest.php
 ```
+
+## Product suggestions during transaction entry (DUMS-40)
+
+While an owner records a credit or a cash purchase, the shared product picker can show up to three **"Often bought together"** suggestions from the store's active DUMS-39 rule set. Suggestions are advisory: they never add a product, change a quantity, or submit the form on their own.
+
+### Where it appears
+
+Record Credit and Record Cash Purchase use the same picker (`resources/views/credits/partials/product-picker.blade.php`), so both pages get the same panel. It stays hidden until the basket holds at least one product.
+
+- Suggestions refresh when a product is added or removed, 300 ms after the last change. No request is sent when the basket hasn't changed.
+- A newer basket aborts the previous request, and late responses for an older basket are ignored.
+- **Add** uses the picker's normal add action: it adds one row with quantity 1 and the catalog price. A product already in the basket is never suggested and cannot be added twice, matching the picker's existing rule.
+- If the request fails, the panel shows "Suggestions are unavailable right now." Searching, adding, editing, and submitting still work as before.
+- Amounts, credit limits, and every other check still happen when the form is submitted, through the existing form requests and services.
+
+### Endpoint
+
+`GET /credits/product-recommendations?product_ids[]=12&product_ids[]=40` (route `credits.product-recommendations`). Middleware is the same as the picker's product search: signed-in store owner with a changed password (`auth`, `password.changed`, `role:store_owner`).
+
+- The store always comes from the signed-in owner. Any store ID, rule-set ID, metric, limit, or ranking value in the request is ignored.
+- `product_ids` is optional: up to 50 distinct positive integers, the same maximum as one purchase. Malformed lists get a 422 validation response.
+- IDs that are not active products of the owner's store are ignored as sources of suggestions.
+- It is read-only. Nothing is trained, activated, or written.
+
+```json
+{
+  "status": "available",
+  "recommendations": [
+    { "id": 40, "name": "Royal 295ml", "unit_price": "20.00", "explanation": "Frequently bought with Pancit Canton." }
+  ]
+}
+```
+
+| `status` | Meaning | Panel text |
+|---|---|---|
+| `available` | One to three suggestions | The suggestions |
+| `no_matches` | The active rules have nothing for these products | "No suggestions for these products yet." |
+| `no_active_model` | The store has no active rule set, for example because training recorded `insufficient_data` | "Suggestions appear once this store has recorded enough sales." |
+| `empty_basket` | No products were sent | The panel stays hidden |
+
+### Ranking
+
+Only the store's own single-item rules (A → B) are used. For each candidate product B, the strongest rule from any product in the basket is chosen by confidence, then lift, then co-occurrence count (highest first), then the lower antecedent product ID. Candidates are ranked by that rule's confidence, then lift, then co-occurrence count, and finally by the lower product ID. Metrics are never added up or weighted across basket products, and no multi-item rules exist. The explanation names the basket product of the chosen rule. It describes past co-occurrence in this store's recorded sales, not cause, popularity, or guaranteed demand. Products inactive in the catalog are never suggested.
+
+### Customer-specific suggestions (deferred)
+
+Suggestions are store-level only. Utang purchases do record a customer, but no existing service turns one customer's history into reliable recommendations, so per-customer affinity is left for a future ticket. The endpoint never reads or returns customer data.
+
+### Performance
+
+Measured on the development MariaDB 10.4.32 (XAMPP, Windows) with synthetic data seeded inside a transaction that was then rolled back: one store, 300 active products, and one active rule set of 12,000 rules (40 per product). Each basket size was run 50 times, through the service and as a full in-process HTTP request through the application kernel (no web server or network):
+
+| Basket products | Queries | Service median / p95 | HTTP median / p95 |
+|---|---|---|---|
+| 1 | 5 | 4.9 / 6.2 ms | 9.4 / 15.6 ms |
+| 5 | 5 | 9.1 / 10.7 ms | 14.4 / 17.3 ms |
+| 20 | 5 | 12.7 / 14.4 ms | 20.9 / 26.1 ms |
+| 50 | 5 | 33.5 / 40.3 ms | 46.0 / 52.4 ms |
+
+The query count does not grow with the basket or the results. MariaDB's query plan uses the existing `(rule_set_id, antecedent_product_id, consequent_product_id)` unique index and sorts only the matching rules, so no index was added. Time grows with the number of rules matched by the basket, because all of them are fetched and sorted before the best three are taken. These figures come from one development machine and are not a production guarantee.
+
+### Tests
+
+```powershell
+php artisan test --compact tests/Feature/ProductRecommendationEndpointTest.php tests/Feature/ProductRecommendationServiceTest.php
+```
+
+The project has no browser test runner, so the panel's JavaScript (debouncing, stale-response handling, the Add button, and failure messages) is not covered by automated tests and was checked by reading the code. The tests cover the endpoint, the ranking, store isolation, read-only behaviour, the panel on both pages, and that recording a transaction does not depend on suggestions.
+
+The fixtures are synthetic. Neither they nor the external Groceries experiments describe real Philippine sari-sari buying behaviour.
