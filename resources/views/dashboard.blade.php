@@ -15,10 +15,10 @@
 
         <nav class="owner-navigation" aria-label="Owner navigation">
             <a class="owner-nav-link is-current" href="{{ route('dashboard') }}" aria-current="page">Dashboard</a>
-            <a class="owner-nav-link" href="{{ route('overdue-accounts.index') }}">Overdue accounts</a>
-            <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email notifications</a>
-            <a class="owner-nav-link" href="{{ route('late-penalties.edit') }}">Late payment policy</a>
-            <a class="owner-nav-link" href="{{ route('password.edit') }}">Change password</a>
+            <a class="owner-nav-link" href="{{ route('overdue-accounts.index') }}">Overdue Accounts</a>
+            <a class="owner-nav-link" href="{{ route('email-settings.edit') }}">Email Notifications</a>
+            <a class="owner-nav-link" href="{{ route('late-penalties.edit') }}">Late Payment Policy</a>
+            <a class="owner-nav-link" href="{{ route('password.edit') }}">Change Password</a>
             <span class="owner-name">{{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
@@ -326,7 +326,7 @@
 <div class="faq-buttons">
     <button type="button" class="faq-button"
         data-question="How many customers are in the database?">
-        Customer Balance
+        Customer Accounts
     </button>
 
     <button type="button" class="faq-button"
@@ -336,7 +336,7 @@
 
     <button type="button" class="faq-button"
         data-question="What is the total outstanding balance of all customers?">
-        Record Payment
+        Outstanding Balance
     </button>
 
     <button type="button" class="faq-button"
