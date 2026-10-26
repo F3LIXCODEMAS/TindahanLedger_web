@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Purchase;
 use App\Support\BasketCounts;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
@@ -41,15 +42,11 @@ class PurchaseBasketCounter
      */
     public function count(int $storeId, int $minPairCount): array
     {
-        if (DB::transactionLevel() === 0 && in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
-            DB::statement('set transaction isolation level repeatable read');
-        }
-
-        return DB::transaction(function () use ($storeId, $minPairCount): array {
+        return $this->withinSnapshot(function () use ($storeId, $minPairCount): array {
             $cutoffPurchaseId = (int) Purchase::query()->where('store_id', $storeId)->max('id');
 
             return [
-                'counts' => $this->countUpTo($storeId, $cutoffPurchaseId, $minPairCount),
+                'counts' => $this->countUpToSnapshot($storeId, $cutoffPurchaseId, $minPairCount),
                 'cutoff_purchase_id' => $cutoffPurchaseId,
             ];
         });
@@ -61,6 +58,28 @@ class PurchaseBasketCounter
      * on (its `source_cutoff_purchase_id`).
      */
     public function countUpTo(int $storeId, int $cutoffPurchaseId, int $minPairCount): BasketCounts
+    {
+        return $this->withinSnapshot(fn (): BasketCounts => $this->countUpToSnapshot($storeId, $cutoffPurchaseId, $minPairCount));
+    }
+
+    /**
+     * Run related read queries against one consistent database snapshot.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $operation
+     * @return T
+     */
+    public function withinSnapshot(Closure $operation): mixed
+    {
+        if (DB::transactionLevel() === 0 && in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            DB::statement('set transaction isolation level repeatable read');
+        }
+
+        return DB::transaction($operation);
+    }
+
+    private function countUpToSnapshot(int $storeId, int $cutoffPurchaseId, int $minPairCount): BasketCounts
     {
         $eligible = $this->eligibleItems($storeId, $cutoffPurchaseId)
             ->select('purchase_items.purchase_id', 'purchase_items.product_id')

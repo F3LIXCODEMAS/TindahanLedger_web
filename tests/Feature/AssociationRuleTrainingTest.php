@@ -191,6 +191,22 @@ describe('basket eligibility', function () {
         expect($snapshot['counts']->basketCount)->toBe(4);
     });
 
+    it('reads the recomputed model counts inside one transaction', function () {
+        $store = Store::factory()->create();
+        recordFourBasketFixture($store);
+        $outerLevel = DB::transactionLevel();
+        $levels = [];
+        DB::listen(function ($query) use (&$levels): void {
+            if (str_contains($query->sql, 'purchase_items')) {
+                $levels[] = DB::transactionLevel();
+            }
+        });
+
+        app(PurchaseBasketCounter::class)->countUpTo($store->id, (int) Purchase::query()->max('id'), 1);
+
+        expect($levels)->toHaveCount(3)->each->toBe($outerLevel + 1);
+    });
+
     it('fixes the purchase cutoff when training starts', function () {
         $store = Store::factory()->create();
         recordFourBasketFixture($store);
@@ -249,6 +265,17 @@ describe('versioning', function () {
         RuleSet::factory()->active()->create(['store_id' => $store->id]);
 
         expect(fn () => RuleSet::factory()->active()->create(['store_id' => $store->id]))->toThrow(QueryException::class);
+    });
+
+    it('does not let an older validated run replace a newer active rule set', function () {
+        $store = Store::factory()->create();
+        $older = RuleSet::factory()->create(['store_id' => $store->id]);
+        $newer = RuleSet::factory()->active()->create(['store_id' => $store->id]);
+
+        expect(fn () => app(RuleSetActivator::class)->activate($older))
+            ->toThrow(RuntimeException::class, 'A newer rule set is already active.');
+        expect($newer->fresh()->status)->toBe(RuleSet::STATUS_ACTIVE);
+        expect($older->fresh()->status)->toBe(RuleSet::STATUS_VALIDATED);
     });
 
     it('keeps the previous version active when the new run has insufficient data', function () {

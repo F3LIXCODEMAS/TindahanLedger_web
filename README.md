@@ -195,7 +195,32 @@ Lift above 1 means the products appear together more often than chance in the ob
 
 All calculations use exact integer arithmetic. Stored values are rounded half-up to six decimals, and thresholds are compared against the exact, unrounded ratio. Every rule stores the counts behind its metrics so it can be audited. One run supports up to 1,000,000 eligible baskets.
 
-Check with the fixture {A,B}, {A,B}, {A,C}, {B,C}: N = 4, count(A) = count(B) = 3, count(A,B) = 2, so A → B has support 0.500000, confidence 0.666667, and lift 0.888889. On the arules Groceries data (9,835 baskets) at support 1% and confidence 30%, the engine produces the same 69 single-item rules, with identical values, as a separate Python pipeline written for the DUMS-39 category-mapping experiment. Both were written in the same project, so this is a cross-check between two implementations, not an independent validation; the results have not been compared against the arules package itself.
+Independently verify the metric formulas with this small fixture. It uses only Python 3's standard library and does not load or import any external dataset:
+
+```python
+from decimal import Decimal, ROUND_HALF_UP
+
+baskets = [{"A", "B"}, {"A", "B"}, {"A", "C"}, {"B", "C"}]
+n = len(baskets)
+count_a = sum("A" in basket for basket in baskets)
+count_b = sum("B" in basket for basket in baskets)
+count_ab = sum({"A", "B"}.issubset(basket) for basket in baskets)
+
+def six_decimal_places(numerator, denominator):
+    return (Decimal(numerator) / Decimal(denominator)).quantize(
+        Decimal("0.000001"), rounding=ROUND_HALF_UP
+    )
+
+metrics = (
+    six_decimal_places(count_ab, n),
+    six_decimal_places(count_ab, count_a),
+    six_decimal_places(count_ab * n, count_a * count_b),
+)
+assert metrics == (Decimal("0.500000"), Decimal("0.666667"), Decimal("0.888889"))
+print("support, confidence, lift:", *(f"{metric:.6f}" for metric in metrics))
+```
+
+This independently checks the stated support, confidence, and lift for one hand-calculated example; it does not validate the engine's database filtering, rule generation, or a real-world dataset. No Python verification pipeline for the previously mentioned arules Groceries comparison is included in this repository, so that historical 69-rule comparison is not reproducible here and is not claimed as independent validation.
 
 ### Thresholds
 

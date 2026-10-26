@@ -34,6 +34,12 @@ class RuleSetActivator
                 throw new RuntimeException('External experiment rule sets are never activated.');
             }
 
+            $active = $scopeRuleSets->first(fn (RuleSet $ruleSet): bool => $ruleSet->status === RuleSet::STATUS_ACTIVE);
+
+            if ($active !== null && (int) $active->getKey() > (int) $locked->getKey()) {
+                throw new RuntimeException('A newer rule set is already active.');
+            }
+
             $now = now();
 
             RuleSet::query()
