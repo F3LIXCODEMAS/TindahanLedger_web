@@ -131,6 +131,22 @@ it('gives the same result every time', function () {
     expect(evaluator()->evaluate($store, '2026-01-01', '2026-02-28'))->toBe(evaluator()->evaluate($store, '2026-01-01', '2026-02-28'));
 });
 
+it('counts and loads evaluation baskets inside one transaction', function () {
+    $store = Store::factory()->create();
+    evaluationFixture($store);
+    $outerLevel = DB::transactionLevel();
+    $levels = [];
+    DB::listen(function ($query) use (&$levels): void {
+        if (str_contains($query->sql, 'purchase_items')) {
+            $levels[] = DB::transactionLevel();
+        }
+    });
+
+    evaluator()->evaluate($store, '2026-01-01', '2026-02-28');
+
+    expect($levels)->toHaveCount(2)->each->toBe($outerLevel + 1);
+});
+
 it('explains why evaluation is unavailable instead of inventing results', function (Closure $setUp, string $reason) {
     $store = Store::factory()->create();
     $setUp($store);

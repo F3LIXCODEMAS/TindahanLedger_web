@@ -84,7 +84,17 @@ class RecommendationEvaluationService
             return [...$result, 'reasons' => ['The training share must be between 10% and 90%.']];
         }
 
-        $basketCount = (int) $this->basketCounter->eligibleItems($storeId, null, $fromDate, $toDate)->distinct()->count('purchase_items.purchase_id');
+        [$basketCount, $baskets] = $this->basketCounter->withinSnapshot(function () use ($storeId, $fromDate, $toDate): array {
+            $basketCount = (int) $this->basketCounter->eligibleItems($storeId, null, $fromDate, $toDate)
+                ->distinct()
+                ->count('purchase_items.purchase_id');
+
+            if ($basketCount === 0 || $basketCount > self::MAX_BASKETS) {
+                return [$basketCount, []];
+            }
+
+            return [$basketCount, $this->loadBaskets($storeId, $fromDate, $toDate)];
+        });
 
         if ($basketCount === 0) {
             return [...$result, 'reasons' => ['There are no eligible purchase baskets in this period.']];
@@ -94,7 +104,6 @@ class RecommendationEvaluationService
             return [...$result, 'reasons' => ['The period has more than '.self::MAX_BASKETS.' baskets. Choose a shorter period.']];
         }
 
-        $baskets = $this->loadBaskets($storeId, $fromDate, $toDate);
         $boundaryDate = $baskets[max(0, (int) floor(count($baskets) * $trainPercent / 100) - 1)]['date'];
         $training = array_values(array_filter($baskets, fn (array $basket): bool => $basket['date'] <= $boundaryDate));
         $heldOut = array_values(array_filter($baskets, fn (array $basket): bool => $basket['date'] > $boundaryDate));
