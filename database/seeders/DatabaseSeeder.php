@@ -6,6 +6,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Services\LedgerService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -33,10 +34,15 @@ class DatabaseSeeder extends Seeder
         }
 
         $ledgerService = app(LedgerService::class);
+        $catalogSourceStore = null;
 
         foreach ($this->demoStores() as $demoStore) {
             $owner = $this->seedOwner($demoStore['owner'], $demoStore['store_name'], $ownerPassword);
             $store = $this->seedStore($owner, $demoStore['store_name']);
+
+            if ($demoStore['store_name'] === 'Mang Arthur Store') {
+                $catalogSourceStore = $store;
+            }
 
             foreach ($demoStore['scenarios'] as $scenario) {
                 DB::transaction(function () use ($store, $scenario, $ledgerService): void {
@@ -64,6 +70,43 @@ class DatabaseSeeder extends Seeder
                 });
             }
         }
+
+        if ($catalogSourceStore instanceof Store) {
+            $this->seedCatalogForExistingStores($catalogSourceStore);
+        }
+    }
+
+    private function seedCatalogForExistingStores(Store $sourceStore): void
+    {
+        $sourceProducts = $sourceStore->products()->get();
+
+        if ($sourceProducts->isEmpty()) {
+            return;
+        }
+
+        $targetStores = Store::query()
+            ->whereHas('owner', fn (Builder $query): Builder => $query->whereIn('username', ['emanstore19', 'arizastore19']))
+            ->get();
+
+        DB::transaction(function () use ($sourceProducts, $targetStores): void {
+            foreach ($targetStores as $targetStore) {
+                $targetProducts = $targetStore->products()->get()->keyBy('normalized_name');
+
+                foreach ($sourceProducts as $sourceProduct) {
+                    if ($targetProducts->has($sourceProduct->normalized_name)) {
+                        continue;
+                    }
+
+                    $targetProduct = $targetStore->products()->make($sourceProduct->only([
+                        'name',
+                        'unit_price',
+                        'description',
+                    ]));
+                    $targetProduct->forceFill(['status' => $sourceProduct->status])->save();
+                    $targetProducts->put($targetProduct->normalized_name, $targetProduct);
+                }
+            }
+        });
     }
 
     /**

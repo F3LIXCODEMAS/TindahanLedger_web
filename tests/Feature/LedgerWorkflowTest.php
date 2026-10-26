@@ -5,6 +5,7 @@ use App\Exceptions\PaymentExceedsBalance;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
+use App\Models\Product;
 use App\Models\Store;
 use App\Models\SukiPoint;
 use App\Models\User;
@@ -286,4 +287,102 @@ it('seeds each demo store owner with the store name as their username', function
         'aling nena store' => 'Aling Nena Store',
     ]);
     expect(User::query()->where('role', User::ROLE_SUPER_ADMIN)->exists())->toBeFalse();
+});
+
+it('copies missing Mang Arthur products to existing target stores without replacing their products', function () {
+    config(['app.demo_owner_password' => 'only-for-this-test-password']);
+
+    $sourceOwner = User::factory()->create([
+        'email' => 'felix@gmail.com',
+        'username' => 'mang arthur store',
+    ]);
+    $sourceStore = Store::factory()->for($sourceOwner, 'owner')->create([
+        'store_name' => 'Mang Arthur Store',
+    ]);
+    $sourceStore->products()->create([
+        'name' => 'Rice 1kg',
+        'unit_price' => '45.00',
+        'description' => 'Mang Arthur price',
+    ]);
+    $inactiveSourceProduct = $sourceStore->products()->create([
+        'name' => 'Instant Coffee 3-in-1',
+        'unit_price' => '12.50',
+        'description' => 'Inactive source item',
+    ]);
+    $inactiveSourceProduct->forceFill(['status' => Product::STATUS_INACTIVE])->save();
+
+    $emanOwner = User::factory()->create(['username' => 'emanstore19']);
+    $emanStore = Store::factory()->for($emanOwner, 'owner')->create(['store_name' => 'Eman Store']);
+    $arizaOwner = User::factory()->create(['username' => 'arizastore19']);
+    $arizaStore = Store::factory()->for($arizaOwner, 'owner')->create(['store_name' => 'mang eman store']);
+    $existingArizaProduct = $arizaStore->products()->create([
+        'name' => 'rice 1kg',
+        'unit_price' => '99.00',
+        'description' => 'Ariza-specific price',
+    ]);
+    $unrelatedStore = Store::factory()->create();
+    $unrelatedProduct = Product::factory()->for($unrelatedStore)->create();
+
+    $this->seed();
+
+    expect($emanStore->products()->count())->toBe(2);
+    expect($arizaStore->products()->count())->toBe(2);
+    expect($existingArizaProduct->fresh()->only(['name', 'unit_price', 'description']))->toBe([
+        'name' => 'rice 1kg',
+        'unit_price' => '99.00',
+        'description' => 'Ariza-specific price',
+    ]);
+    expect($emanStore->products()
+        ->where('normalized_name', Product::normalizeName('Rice 1kg'))
+        ->firstOrFail()
+        ->only(['name', 'unit_price', 'description']))->toBe([
+            'name' => 'Rice 1kg',
+            'unit_price' => '45.00',
+            'description' => 'Mang Arthur price',
+        ]);
+    expect($emanStore->products()
+        ->where('normalized_name', Product::normalizeName('Instant Coffee 3-in-1'))
+        ->firstOrFail()
+        ->only(['name', 'unit_price', 'description', 'status']))->toBe([
+            'name' => 'Instant Coffee 3-in-1',
+            'unit_price' => '12.50',
+            'description' => 'Inactive source item',
+            'status' => Product::STATUS_INACTIVE,
+        ]);
+    expect($arizaStore->products()
+        ->where('normalized_name', Product::normalizeName('Instant Coffee 3-in-1'))
+        ->firstOrFail()
+        ->only(['name', 'unit_price', 'description', 'status']))->toBe([
+            'name' => 'Instant Coffee 3-in-1',
+            'unit_price' => '12.50',
+            'description' => 'Inactive source item',
+            'status' => Product::STATUS_INACTIVE,
+        ]);
+    expect($unrelatedProduct->fresh()->store_id)->toBe($unrelatedStore->id);
+
+    $this->seed();
+
+    expect($emanStore->products()->count())->toBe(2);
+    expect($arizaStore->products()->count())->toBe(2);
+});
+
+it('does not create the emanstore19 account or store when it is absent', function () {
+    config(['app.demo_owner_password' => 'only-for-this-test-password']);
+
+    $sourceOwner = User::factory()->create([
+        'email' => 'felix@gmail.com',
+        'username' => 'mang arthur store',
+    ]);
+    $sourceStore = Store::factory()->for($sourceOwner, 'owner')->create([
+        'store_name' => 'Mang Arthur Store',
+    ]);
+    $sourceStore->products()->create([
+        'name' => 'Rice 1kg',
+        'unit_price' => '45.00',
+    ]);
+
+    $this->seed();
+
+    $this->assertDatabaseMissing('users', ['username' => 'emanstore19']);
+    $this->assertDatabaseMissing('stores', ['store_name' => 'Eman Store']);
 });
