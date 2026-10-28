@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>TindahanLedger Chapter 4 Tables</title>
+<style>
+@page { size: A4 landscape; margin: 16mm; } body { font-family: Arial, Helvetica, sans-serif; color: #172033; line-height: 1.35; } h1 { font-size: 22pt; } h2 { font-size: 16pt; margin-top: 24pt; } h3 { font-size: 13pt; margin-top: 18pt; } table { border-collapse: collapse; width: 100%; margin: 8pt 0 3pt; page-break-inside: auto; font-size: 9pt; } caption { caption-side: top; text-align: left; font-weight: bold; font-size: 11pt; padding: 5pt 0; } th, td { border: 1px solid #667085; padding: 5pt; vertical-align: top; } th { background: #eaf3fb; } tr { page-break-inside: avoid; } .source { font-size: 8.5pt; color: #475569; margin-top: 2pt; } code { font-family: Consolas, monospace; } .intro { font-size: 10pt; color: #475569; }</style></head><body>
+<h1>Chapter 4 tables - Word-friendly compilation</h1>
+<p class="intro">Tables are reproduced from the current Chapter 4 Markdown drafts and arranged in chapter order. Open this HTML file in Microsoft Word or copy individual tables into the chapter. Proposed targets and [NEEDS VERIFICATION] notes are preserved. No PERT calculations are supplied because approved durations and dependencies are unavailable.</p>
+<h2>4.1.1 Performance Requirements</h2>
+<table><caption>Table 4.1. Proposed performance requirements for TindahanLedger</caption>
+<thead><tr>
+<th>Requirement ID</th>
+<th>System Feature or Module</th>
+<th>Performance Requirement and Timing Relationship</th>
+<th>Design Rationale</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>PERF-01</td>
+<td>Owner and Super Admin authentication</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Complete a valid login request and return the authenticated redirect within 2 seconds at p95, excluding the user&#39;s network transit time. Login throttling and active-account checks must remain enforced and must not be bypassed to meet the target.</td>
+<td>Authentication gates all protected owner/admin operations; a measurable response limit supports routine use while retaining credential checks and throttle behavior. The target must be tested on the approved runtime and hardware.</td>
+</tr>
+<tr>
+<td>PERF-02</td>
+<td>Customer management</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Complete customer list, detail, create, or update requests within 2 seconds at p95 for an agreed store/customer dataset size.</td>
+<td>Customer information is used repeatedly in ledger operations. An explicit dataset size is needed because listing and retrieval time depends on database volume and pagination.</td>
+</tr>
+<tr>
+<td>PERF-03</td>
+<td>Credit transaction recording</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Validate and persist a valid credit, enforce the credit-limit rule, and complete the database transaction within 2 seconds at p95 for an approved workload. Measure the complete request-to-response time separately because a configured synchronous receipt attempt occurs after the financial transaction. The credit and its structured purchase items, when present, must remain in the same database transaction.</td>
+<td>The <code>LedgerService</code> validates balances under a customer lock and persists credit-related records transactionally. Performance must not be achieved by skipping financial checks or returning success before persistence completes. The owner-visible response includes the mail attempt, so both transaction and full-request durations must be recorded.</td>
+</tr>
+<tr>
+<td>PERF-04</td>
+<td>Payment recording</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Validate, allocate a valid payment to outstanding entries, update the balance and any completed debt-cycle record, and complete the database transaction within 2 seconds at p95 for an approved workload. Measure the complete request-to-response time separately because a configured synchronous receipt attempt occurs after the financial transaction.</td>
+<td>Payment allocation and the updated balance must be consistent. The timing test must include the actual ledger size and database engine rather than measuring only a simple page response.</td>
+</tr>
+<tr>
+<td>PERF-05</td>
+<td>Running balance and financial summary</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Return the customer financial summary and paginated ledger view within 1 second at p95 for an agreed number of ledger entries.</td>
+<td>Owners and customers need timely balance information. The actual history size and database engine must be stated when validating the target.</td>
+</tr>
+<tr>
+<td>PERF-06</td>
+<td>Product catalog</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Return a product listing or product-search response within 1 second at p95 for an agreed catalog size and query.</td>
+<td>Product selection supports credit and cash purchase recording. The target should be checked for both catalog browsing and the transaction picker, not inferred from a single static page.</td>
+</tr>
+<tr>
+<td>PERF-07</td>
+<td>Cash purchase recording</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Validate and persist a cash purchase containing up to the implemented maximum of 50 distinct products, then return its result within 2 seconds at p95, excluding client rendering and network transit.</td>
+<td>The request path calculates line totals from validated quantities/prices and verifies the reviewed total. The 50-item maximum is present in <code>LedgerService::MAX_PURCHASE_ITEMS</code>; the elapsed-time limit is not an approved project specification.</td>
+</tr>
+<tr>
+<td>PERF-08</td>
+<td>Customer self-service QR portal</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Resolve a valid QR credential and return the read-only portal page within 2 seconds at p95 for an agreed customer-history size. The portal&#39;s 15-minute inactivity setting must continue to apply.</td>
+<td>Timely read-only access is useful to customers, but the limit must be evaluated without weakening token validation, revocation checks, store-status checks, or session expiration.</td>
+</tr>
+<tr>
+<td>PERF-09</td>
+<td>Gmail SMTP notifications</td>
+<td>The Gmail mailer is configured with a <strong>15-second transport timeout</strong> (<code>app/Services/MailDeliveryService.php</code>). This is a code-configured ceiling for an SMTP attempt, not a measured delivery guarantee. <strong>[NEEDS VERIFICATION]</strong> Record end-to-end attempt duration, application response impact, failure/retry behavior, and actual delivery only after authorized credentials and a controlled test are available.</td>
+<td>Receipt and reminder mail can depend on an external SMTP service. The transport attempt must be distinguished from financial persistence; a successful SMTP handoff does not establish arrival in a recipient&#39;s inbox.</td>
+</tr>
+<tr>
+<td>PERF-10</td>
+<td>Suki Points earning, cycle completion, and redemption</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Complete the database transaction for point earning, debt-cycle completion, or a valid redemption within 2 seconds at p95 (the same proposed transaction target as PERF-03/PERF-04). Record full request-to-response time separately where synchronous mail is also sent. Each balance, payment allocation, point change, and cycle record must remain atomic.</td>
+<td>Loyalty calculations affect financial and points records. The timing criterion should be measured on the full transaction and cannot justify separating related writes into inconsistent states.</td>
+</tr>
+<tr>
+<td>PERF-11</td>
+<td>Product recommendations during transaction entry</td>
+<td><strong>[PROPOSED TARGET — FOR APPROVAL]</strong> Complete a recommendation request for a basket of up to 50 product IDs within 250 milliseconds at p95, using the documented benchmark workload of 300 active products and a 12,000-rule active set as the initial comparison fixture. Revalidate the target on the approved target environment before acceptance.</td>
+<td>The picker requests suggestions while an owner edits a basket. Existing README measurements report a 52.4 ms HTTP p95 for 50 basket products in one in-process MariaDB 10.4.32 development benchmark, with 5 queries; this is a local observation, not an accepted target or production guarantee.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.1.2 Safety Requirements</h2>
+<table><caption>Table 4.2. Safety requirements for TindahanLedger</caption>
+<thead><tr>
+<th>Requirement ID</th>
+<th>Potential Hazard or Loss Scenario</th>
+<th>System Safeguard and Required Action</th>
+<th>Prevented Action or Constraint</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>SAFE-01</td>
+<td>An incorrect outstanding balance is displayed or used to make a credit decision.</td>
+<td><code>LedgerService</code> calculates money in integer cents through <code>Money</code>, applies payment allocations and balance changes in a database transaction, and locks the customer row during financial updates. The application must report validation or persistence failure rather than confirm an uncommitted transaction.</td>
+<td>A credit whose projected outstanding balance exceeds the customer&#39;s credit limit is rejected; a payment exceeding the applicable outstanding amount is rejected.</td>
+</tr>
+<tr>
+<td>SAFE-02</td>
+<td>Repeated submission or a retry records the same payment more than once.</td>
+<td>Payment requests require a UUID idempotency key. A unique database constraint and <code>LedgerService</code> replay handling return the prior payment batch for a repeated key instead of applying the same submission again.</td>
+<td>Duplicate application of a payment submission with the same idempotency key is prevented by the database/service path. The key must not be treated as proof that two different keys represent the same real-world cash receipt.</td>
+</tr>
+<tr>
+<td>SAFE-03</td>
+<td>An erroneous amount, unsupported product, or stale total creates an incorrect credit or sale.</td>
+<td>Server-side Form Requests validate positive, two-decimal monetary amounts; transaction services perform financial checks, verify catalog/store ownership, calculate line totals, and compare the submitted expected cash-sale total with the server total. Credit records and any structured purchase details are written together.</td>
+<td>Zero/negative amounts, credit-limit overrun, invalid item data, duplicate product rows, inactive/out-of-store products, and a mismatched cash-sale total are rejected. Product descriptions do not silently change the amount of a credit.</td>
+</tr>
+<tr>
+<td>SAFE-04</td>
+<td>Deleting a customer or transaction removes history needed to explain balances or disputes.</td>
+<td>Foreign keys use restrictive deletion for financial history and dependent records, including credit/payment relationships, Suki Point history, debt-cycle records, and purchase history. The user must resolve dependent records through an authorized, documented retention process rather than bypassing constraints.</td>
+<td>A customer, credit, payment, product, or rule set with protected dependent history cannot be deleted through the constrained relationships. A backup/restore process is not evidenced and must not be assumed.</td>
+</tr>
+<tr>
+<td>SAFE-05</td>
+<td>Suki Points are over-redeemed, redeemed against no debt, or deducted more than once.</td>
+<td>The redemption request validates a positive whole-number point amount. <code>LedgerService::redeemSukiPoints</code> locks the customer and points records, checks available points and debt, records the redemption/payment allocation and point transaction atomically, and recognizes a repeat idempotency key.</td>
+<td>Redemption above the available point balance or outstanding debt, redemption against a zero balance, and repeat deduction under the same idempotency key are rejected/prevented.</td>
+</tr>
+<tr>
+<td>SAFE-06</td>
+<td>An unauthorized person changes or views customer financial records.</td>
+<td>Owner routes require authentication, changed-password status, and the store-owner role; customer and ledger policies check store ownership. Super Admin routes use a separate role. The system must retain these controls on all financial read/write routes and deny cross-store requests.</td>
+<td>Guest, wrong-role, and cross-store customer actions are denied. A suspended store is read-only for the protected transaction routes; a customer cannot write through the read-only QR portal.</td>
+</tr>
+<tr>
+<td>SAFE-07</td>
+<td>Hardware, host, or database failure causes loss of financial records.</td>
+<td>Financial writes use database transactions and relational constraints to avoid partial application of the covered transaction. Operators must establish, document, and test backups, recovery steps, and access controls before using production financial records.</td>
+<td>No claim is made that database transactions alone prevent loss caused by disk failure, deletion, ransomware, or unavailable infrastructure. Until an approved recovery process exists, production readiness for this hazard remains <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>SAFE-08</td>
+<td>A late-fee policy change alters the terms of an already recorded credit, or a duplicate penalty is applied.</td>
+<td>The credit stores the accepted policy snapshot; a penalty is a separate linked ledger entry with a unique link to the original credit. Changes to a store policy do not rewrite historical snapshots.</td>
+<td>A second penalty for the same credit is prevented by the unique relationship. Existing credits without the relevant snapshot are not to be silently reinterpreted as covered by a later policy.</td>
+</tr>
+<tr>
+<td>SAFE-09</td>
+<td>A customer or owner revisits an old payment confirmation and is shown a historical remaining/previous balance calculated from transactions recorded later.</td>
+<td>The inspected fallback in <code>PaymentController::confirmation</code> derives prior/remaining balances from the customer&#39;s current balance when the original session receipt is absent. <strong>[NEEDS VERIFICATION / CORRECTIVE ACTION]</strong> Before treating a revisited confirmation as a historical receipt, persist an immutable batch receipt snapshot or display only values that remain derivable from that batch. Verify with a test that records later credits/payments before reopening the earlier confirmation.</td>
+<td>Do not present a balance affected by later transactions as the balance immediately after an older payment. This safeguard is not established by the current fallback.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.1.3 Security Requirements</h2>
+<table><caption>Table 4.3. Security requirements for TindahanLedger</caption>
+<thead><tr>
+<th>Requirement ID</th>
+<th>Security or Privacy Domain</th>
+<th>Authentication and Protection Requirement</th>
+<th>Policy or Standard Alignment</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>SEC-01</td>
+<td>Owner and administrator authentication</td>
+<td>Require an authenticated active account for protected routes. Enforce role checks for Store Owner and Super Admin routes. The login flow normalizes usernames, limits repeated failed attempts (five attempts per throttle window in the inspected controller), regenerates the session after authentication, and requires an administrator-issued temporary password to be changed before ordinary use. Password reset and multi-factor authentication were not established as implemented features.</td>
+<td>Compare authentication design with NIST SP 800-63B-4 (NIST, 2025) and the authentication requirements in OWASP ASVS 5.0.0. This comparison is not a conformance claim.</td>
+</tr>
+<tr>
+<td>SEC-02</td>
+<td>Password storage and handling</td>
+<td>Store passwords through Laravel&#39;s <code>hashed</code> model cast and exclude password and remember-token fields from model serialization. Do not log, expose, or return passwords. Continue to require server-side password-change validation for temporary credentials. The selected production hashing configuration and password-strength policy require deployment/configuration verification.</td>
+<td>NIST SP 800-63B-4; OWASP ASVS 5.0.0. Verify the actual production configuration before asserting alignment.</td>
+</tr>
+<tr>
+<td>SEC-03</td>
+<td>Session protection and request forgery</td>
+<td>Regenerate the session on successful owner login and QR portal access; invalidate it and regenerate the CSRF token on logout. The application uses Laravel&#39;s <code>web</code> routes, which apply the framework&#39;s web middleware protections. Private portal responses set <code>no-store</code>, <code>private</code>, and <code>no-referrer</code> headers. Effective cookie flags, HTTPS enforcement, and production session-store protection depend on deployment configuration and require verification.</td>
+<td>OWASP ASVS 5.0.0 session-management and request-protection controls; NIST SP 800-63B-4 for authentication-session considerations.</td>
+</tr>
+<tr>
+<td>SEC-04</td>
+<td>Store/tenant isolation and authorization</td>
+<td>Derive the owner&#39;s store from the authenticated user rather than trusting a client-supplied store identifier. Scope customer/product/transaction access to that store, authorize customer and ledger access through policies, and enforce role restrictions. Composite foreign keys in migrations enforce selected customer/store and transaction ownership relationships.</td>
+<td>OWASP ASVS 5.0.0 access-control requirements. Cross-store denial is also covered by <code>TenantIsolationTest.php</code>; this does not replace a full authorization review.</td>
+</tr>
+<tr>
+<td>SEC-05</td>
+<td>Customer QR portal credential</td>
+<td>Treat a QR code as a bearer credential: possession grants access but does not verify the holder&#39;s identity. Generate a random token, store its SHA-256 lookup hash and encrypted printable token, revoke replaced codes, remove the encrypted token on revocation, and check credential/store status and a configured 15-minute idle timeout on portal access. Place the QR token in the URL fragment; private headers are applied to portal pages. The token must not be described as password or identity-based authentication.</td>
+<td>OWASP ASVS 5.0.0 access-control/session requirements; privacy risk review under the applicable data-protection policy. QR issuance/revocation and portal behavior have feature tests.</td>
+</tr>
+<tr>
+<td>SEC-06</td>
+<td>Customer financial-data confidentiality</td>
+<td>Limit owner access to customers in the owner&#39;s store and expose only the customer&#39;s read-only ledger through an active portal session. Prevent caching and referrer leakage on private portal routes. Require HTTPS, suitable storage/access controls, a privacy notice, and a retention/disposal policy in the deployed service; these operational requirements are not verified by repository code alone.</td>
+<td>Republic Act No. 10173 (Data Privacy Act of 2012) and National Privacy Commission guidance may be relevant to personal-data processing in the Philippines; applicability and compliance require legal/organizational review. OWASP ASVS 5.0.0 is a technical comparison baseline.</td>
+</tr>
+<tr>
+<td>SEC-07</td>
+<td>Input validation and data integrity</td>
+<td>Validate untrusted request fields server-side using Laravel validation/Form Requests and apply business-rule checks in transaction services. Preserve store/customer ownership constraints and require positive monetary values, valid UUID idempotency keys, and bounded purchase-item lists on the inspected financial paths. Review all endpoints, background commands, and imports to ensure the same controls apply.</td>
+<td>OWASP ASVS 5.0.0 input-validation and data-protection requirements.</td>
+</tr>
+<tr>
+<td>SEC-08</td>
+<td>SQL injection and output encoding</td>
+<td>Use bound Eloquent/query-builder operations for the inspected financial and portal data paths; do not concatenate untrusted input into raw SQL. Continue to use context-appropriate output escaping in Blade. A repository-wide query/output-encoding assessment and security test report were not produced for this documentation task.</td>
+<td>OWASP ASVS 5.0.0 injection-prevention and output-encoding requirements. No claim of complete injection immunity is made.</td>
+</tr>
+<tr>
+<td>SEC-09</td>
+<td>Gmail SMTP credentials and notification data</td>
+<td>Store the owner&#39;s SMTP App Password using Laravel&#39;s encrypted cast and hide it from model serialization. The Gmail mailer uses port 587 with required TLS and a configured 15-second timeout; failure logs are designed to mask recipient/sensitive values. Validate customer recipient addresses and send credit/payment receipts only after the financial service returns. Protect production <code>APP_KEY</code>, SMTP settings, logs, and transport configuration. Real Gmail delivery and production secret management were not verified.</td>
+<td>OWASP ASVS 5.0.0 secrets/communications requirements; NIST guidance for credential handling where applicable. Mail transport configuration is not proof of inbox delivery or end-to-end confidentiality.</td>
+</tr>
+<tr>
+<td>SEC-10</td>
+<td>Administrative and financial changes</td>
+<td>Separate Super Admin and Store Owner roles, restrict management routes by middleware, and use the audit logger for recorded administrative actions. Confirm that sensitive financial adjustments, policy waivers, credential issuance/revocation, and administrative changes are authorized and logged with appropriate actor/context without storing secrets. Audit coverage and retention require verification.</td>
+<td>OWASP ASVS 5.0.0 access-control and logging requirements; applicable organizational privacy and record-retention policies.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.2.1 Systems Development Life Cycle (SDLC) Processes</h2>
+<table><caption>Table 4.4. SDLC phases and TindahanLedger evidence</caption>
+<thead><tr>
+<th>Phase</th>
+<th>Purpose in the selected model</th>
+<th>Actual TindahanLedger activities evidenced</th>
+<th>Supporting project evidence</th>
+<th>Evidence limitation</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Requirements selection and analysis</td>
+<td>Select a bounded problem, record expected behavior, and identify business constraints for an increment.</td>
+<td>Ticket-keyed work is visible in commit subjects and branch names. Feature scope is reflected in implementation and documentation for customer/ledger workflows, purchases, QR access, email, loyalty, and recommendations.</td>
+<td>Ticket identifiers in <code>README.md</code> and <code>SPRINT-1-AUDIT-HANDOFF.md</code>; Git commit subjects such as DUMS-36 through DUMS-41; feature-specific Form Requests and tests.</td>
+<td>The Jira board, issue descriptions/status history, approved acceptance criteria, and stakeholder sign-off are <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Analysis and design</td>
+<td>Translate requirements into routes, role boundaries, validation, services, data relationships, and user flows.</td>
+<td>Laravel routes and middleware separate Store Owner, Super Admin, and customer portal access. Migration files progressively introduce stores, financial records, products/purchases, points, credentials, reminders, penalties, and recommendation rule sets.</td>
+<td><code>routes/web.php</code>; <code>bootstrap/app.php</code>; <code>app/Http/Requests/</code>; <code>app/Policies/</code>; <code>app/Services/</code>; <code>database/migrations/</code>; relevant models and tests.</td>
+<td>No dated, approved design specification or review minutes were found. Some design decisions are documented in source comments/README, not in a separate signed design record.</td>
+</tr>
+<tr>
+<td>Incremental implementation</td>
+<td>Add a working capability without treating the whole system as a single one-time release.</td>
+<td>Ticket-oriented feature work includes itemized credit purchase support, cash purchases, basket validation, a single-item association-rule engine, transaction-entry suggestions, and purchase analytics. The branch list contains feature-/ticket-named branches; their names support branch-based work but do not alone prove review or merge procedures.</td>
+<td>Git branch names and history; Laravel controllers/services; migrations; Blade views; <code>composer.json</code> and <code>package.json</code>.</td>
+<td>Exact branch-to-merge mapping, pull-request approval, release tags, and deployment history are <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Verification and regression testing</td>
+<td>Check the increment&#39;s expected behavior and guard existing financial workflows against regressions.</td>
+<td>Separate Pest feature and unit tests cover authentication, role access, tenant isolation, credit/payment behavior, cash purchases, QR portal behavior, mail settings, Suki Point redemption, and recommendation logic.</td>
+<td><code>tests/Feature/</code>; <code>tests/Unit/</code>; <code>phpunit.xml</code>; project README and Sprint 1 audit handoff.</td>
+<td>Tests run here use SQLite <code>:memory:</code> as configured in <code>phpunit.xml</code>. Production MySQL/MariaDB concurrency and browser/device behavior are not established by that suite.</td>
+</tr>
+<tr>
+<td>Review and refinement</td>
+<td>Use test findings, observed constraints, and additional requirements to revise or extend the system.</td>
+<td>Later ticketed commits refine recommendation snapshots/activation and add analytics/evaluation. Documentation explicitly limits customer-specific recommendations and external dataset import; README warns that the available external basket file is unsuitable and not approved for customer-facing use.</td>
+<td>Later DUMS-39 and DUMS-41 commits; <code>README.md</code> sections on DUMS-38 through DUMS-41; recommendation and analytics services/tests.</td>
+<td>Formal retrospective records, backlog prioritization history, user feedback, and approval of the next increment are <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Release and operation</td>
+<td>Package, deploy, monitor, and maintain an accepted increment.</td>
+<td>README documents how to configure a production scheduler and how to perform restricted local QR testing. Scheduler commands are defined in source.</td>
+<td><code>README.md</code>; <code>routes/console.php</code>; <code>app/Console/Commands/</code>; application configuration.</td>
+<td>A production host, actual release, public deployment, operational ownership, backup procedure, and production monitoring are not evidenced. Local instructions are not proof of deployment.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.2.2 Test Plan</h2>
+<table><caption>Table 4.5. TindahanLedger test plan</caption>
+<thead><tr>
+<th>Test Phase or Module</th>
+<th>Testing Method</th>
+<th>Actual Plan and Test Procedure</th>
+<th>Assessment Criteria and Expected Outcome</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Authentication and authorization</td>
+<td>Automated feature tests for valid/invalid login, throttling, active/inactive accounts, temporary-password change, role restrictions, logout, and protected routes; manual browser check on the approved release.</td>
+<td><strong>Implemented tests exist</strong> in <code>OwnerAuthenticationTest.php</code>, <code>ChangePasswordTest.php</code>, and <code>RoleAccessTest.php</code>. Run the focused tests after authentication changes. Verify that successful login rotates the session; logout invalidates it and regenerates the CSRF token. Browser/device validation is <strong>planned / [NEEDS VERIFICATION]</strong>.</td>
+<td>Valid users are authenticated and directed according to role; inactive or invalid accounts cannot access protected functions; throttling is enforced; temporary passwords are changed before normal access; logout ends the session. No protected route is accessible to a guest or wrong role.</td>
+</tr>
+<tr>
+<td>Customer and store isolation</td>
+<td>Automated cross-store access tests against customer, ledger, transaction summaries, and store-scoped records; review route policies and database constraints.</td>
+<td><strong>Implemented tests exist</strong> in <code>TenantIsolationTest.php</code>, <code>CustomerPolicyTest.php</code>, and <code>ProductPolicyTest.php</code>. Run them after modifying store-scoped queries, policies, or route middleware. Supplement with a target-database check of composite foreign keys.</td>
+<td>An owner can access only records belonging to the owner&#39;s store; attempts to access another store&#39;s customer/financial record do not disclose the record; cross-store relations cannot be persisted where composite constraints apply. Target MySQL/MariaDB constraint test is <strong>planned / [NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Credit transaction recording</td>
+<td>Feature tests for valid credit, invalid/zero amount, limit boundary, limit overrun, invalid products, duplicate submission key, transaction rollback, and structured purchase items.</td>
+<td><strong>Implemented tests exist</strong> in <code>RecordCreditTest.php</code>, <code>StructuredCreditItemsTest.php</code>, and related workflow tests. Run focused tests for service/request/migration changes; verify a credit and its structured purchase items are committed together.</td>
+<td>Valid credit within the limit persists once and updates the customer balance; over-limit and invalid submissions are rejected with no partial records; the same idempotency key does not create a duplicate. Concurrency on the intended production database remains <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Payment recording and balance accuracy</td>
+<td>Feature tests for partial/full payment, overpayment, FIFO allocation, repeated idempotency key, batch grouping, and customer balance/running history; hand-calculate representative balances and compare with service output.</td>
+<td><strong>Implemented tests exist</strong> in <code>RecordPaymentTest.php</code>, <code>CustomerLedgerTest.php</code>, <code>LedgerWorkflowTest.php</code>, and <code>TransactionReceiptTest.php</code>. The handoff identifies a remaining historical-confirmation limitation: when the original session receipt is absent, an old confirmation may derive previous/remaining balances from current customer activity. Add/execute a regression test after later transactions are recorded.</td>
+<td>Payment cannot exceed the applicable outstanding amount; allocation order and running balances match business rules; repeat submission does not apply twice. Historical confirmation must not present current balance as a batch-time balance. The latter behavior is <strong>not established as safely implemented</strong> and requires corrective verification.</td>
+</tr>
+<tr>
+<td>Product catalog</td>
+<td>Feature tests for create/update, normalization, active/inactive status, store scoping, price validation, and catalog access.</td>
+<td><strong>Implemented tests exist</strong> in <code>ProductCatalogTest.php</code> and <code>ProductPolicyTest.php</code>. Run focused tests when catalog validation, status, or pricing logic changes.</td>
+<td>Only valid products in the owner&#39;s store can be added/updated; inactive or foreign-store products cannot be used in a transaction; invalid prices/names are rejected.</td>
+</tr>
+<tr>
+<td>Cash purchase recording</td>
+<td>Feature tests for item/quantity validation, server-side line total, expected-total mismatch, walk-in/known customer, duplicate products, inactive/out-of-store products, idempotency, and separation from debt/points.</td>
+<td><strong>Implemented tests exist</strong> in <code>CashPurchaseTest.php</code>. Run after changes to price calculation, item schemas, or purchase persistence.</td>
+<td>A valid purchase persists consistent item snapshots and calculated total exactly once; a stale or invalid expected total is rejected; cash purchase creates no credit/payment and does not change debt balance or Suki Points.</td>
+</tr>
+<tr>
+<td>Customer self-service QR portal</td>
+<td>Feature tests for credential issue/reissue/revoke, malformed/unknown/revoked token, store suspension, session rotation/idle timeout, read-only access, privacy headers, and rate limit; manual scan on approved mobile browsers.</td>
+<td><strong>Implemented tests exist</strong> in <code>CustomerAccessCodeTest.php</code> and <code>CustomerPortalTest.php</code>. README provides local-network/hotspot scan instructions, but an actual device test is not evidenced. Conduct manual scanning only on a trusted network and record device/browser and result.</td>
+<td>Only an active credential opens the corresponding customer&#39;s read-only portal; revoked credentials stop working; session is regenerated and ends at configured inactivity; suspended store is unavailable; private responses are not cached and do not send referrer data. Real-device verification is <strong>planned / [NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Email notifications and reminders</td>
+<td>Unit/feature tests with mocked SMTP transport; verify scheduled command configuration and retry/log behavior; controlled Gmail delivery to an authorized mailbox.</td>
+<td><strong>Automated transport/settings tests exist</strong> in <code>ReusableEmailTest.php</code>, <code>EmailSettingsTest.php</code>, and <code>PaymentReminderServiceTest.php</code>. README and the audit handoff state that no real Gmail credentials/message/inbox delivery were verified. A real send is a separate manual test requiring owner-provided credentials stored only in local secret configuration.</td>
+<td>Invalid recipients are rejected; secrets are not exposed in serialization/logs; failures are recorded/reported; reminders follow schedule and duplicate-prevention rules. SMTP mock acceptance is not inbox delivery. Actual Gmail delivery remains <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Suki Points earning, cycle completion, and redemption</td>
+<td>Feature tests for accrual/remainders, cycle thresholds, rewards, redemption limits, no-debt case, repeated key, and atomic points/payment updates.</td>
+<td><strong>Implemented tests exist</strong> in <code>SukiPointEarningTest.php</code>, <code>SukiCycleRewardTest.php</code>, and <code>SukiPointRedemptionTest.php</code>. Run focused tests after any change to payment, cycle, or loyalty rules.</td>
+<td>Points match configured earning and reward rules; redemption cannot exceed points or eligible outstanding debt; points deduction and ledger allocation are atomic; replay of the same key does not deduct twice.</td>
+</tr>
+<tr>
+<td>Recommendation engine and transaction-entry suggestions</td>
+<td>Unit/feature tests for basket counts, support/confidence/lift, thresholds, store isolation, model lifecycle, ranking, no active model, and read-only endpoint; offline held-out evaluation on eligible data.</td>
+<td><strong>Implemented tests exist</strong> in <code>AssociationRuleTrainingTest.php</code>, <code>ProductRecommendationServiceTest.php</code>, <code>ProductRecommendationEndpointTest.php</code>, <code>RecommendationEvaluationTest.php</code>, and related unit tests. README documents a local MariaDB performance benchmark and synthetic offline evaluation; it explicitly says external baskets are not approved for customer-facing recommendations and the 301-basket evaluation is exploratory.</td>
+<td>Rules and suggestions use the correct store&#39;s active rule set, only active products, and the documented metrics/ranking. No customer data is exposed and the suggestion endpoint does not change a transaction. Effectiveness on representative sari-sari data is <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Regression suite and target-database verification</td>
+<td>Run focused Pest tests for changed modules, then full test suite; separately run approved MySQL/MariaDB integrity/concurrency tests.</td>
+<td><strong>Completed during documentation work:</strong> full <code>php artisan test --compact</code> reported 858 passed and 3,348 assertions. <code>phpunit.xml</code> uses SQLite <code>:memory:</code>. <strong>Not completed by that run:</strong> MySQL/MariaDB concurrency/integration verification, production browser/device tests, or deployment acceptance.</td>
+<td>The recorded suite result is reproducible only with its recorded environment. Target-database and release tests must be reported separately with database/version, dataset, duration, and outcomes.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.2.3 Security Plan</h2>
+<table><caption>Table 4.6. TindahanLedger security plan</caption>
+<thead><tr>
+<th>Security Layer</th>
+<th>Actual Security Plan and Implementation</th>
+<th>What to Assess During Security Testing</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Owner/admin authentication</td>
+<td><strong>Implemented:</strong> authenticated web routes; active-account middleware; distinct Store Owner and Super Admin role checks; login rate limiting; session ID regeneration on login; logout invalidation and CSRF-token regeneration; forced change of administrator-issued temporary password. <code>User</code> uses Laravel&#39;s <code>hashed</code> password cast.</td>
+<td>Attempt guest, inactive-account, wrong-password, throttled, wrong-role, and temporary-password access. Verify session rotation and termination. Inspect the deployed password-hashing configuration, password policy, TLS, and cookie settings; production configuration is <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Authorization and store isolation</td>
+<td><strong>Implemented:</strong> owner routes are scoped by the signed-in user&#39;s store; role middleware and policies protect operations; customer/ledger access checks ownership; migrations contain store/customer consistency constraints; tenant-isolation tests exist.</td>
+<td>Test direct object references, altered IDs, query parameters, and all read/write routes across two stores. Verify DB composite constraints on the target engine and ensure new endpoints do not trust a submitted store ID.</td>
+</tr>
+<tr>
+<td>Financial transaction integrity</td>
+<td><strong>Implemented:</strong> server-side Form Request validation; services enforce business rules; database transactions and row locks are used for credit/payment/redemption workflows; UUID idempotency keys protect selected replayable submissions; foreign keys restrict deletion of financial history.</td>
+<td>Test invalid/negative/over-limit amounts, duplicate/replayed submissions, partial failure/rollback, concurrent operations, payment/customer/entry consistency, and auditability. MySQL/MariaDB concurrency tests and production record integrity remain <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Customer QR portal</td>
+<td><strong>Implemented:</strong> random bearer tokens; hash-based lookup; encrypted printable token; revocation/reissue; per-request active credential/store checks; rate-limited token submission; session regeneration and idle expiry; read-only customer ledger; private/no-store/no-referrer response headers. QR possession authenticates possession of the code, not the holder&#39;s identity.</td>
+<td>Test malformed, guessed, copied, revoked, replaced, expired-session, and suspended-store cases; ensure the token is absent from initial request path/referrer/logs and portal has no state-changing routes. Review issuance, reprinting, physical display, and revocation procedures.</td>
+</tr>
+<tr>
+<td>Input validation, query/data handling, and browser request protections</td>
+<td><strong>Implemented in reviewed routes:</strong> Laravel Form Requests/request validation and Eloquent/query-builder access are used on inspected flows; web routes use Laravel&#39;s web middleware group; Blade templates are used. This review is not an exhaustive injection/output-encoding assessment.</td>
+<td>Run a full endpoint inventory and test boundary inputs, authorization-before-disclosure, CSRF enforcement in a non-test runtime, output encoding, and any raw SQL. Confirm parameter binding on every untrusted query and verify error responses do not disclose customer data.</td>
+</tr>
+<tr>
+<td>Customer financial-information privacy</td>
+<td><strong>Implemented:</strong> owner access is store scoped; customer portal returns a read-only ledger; private portal pages set cache/referrer protections; customer and purchase histories are modeled with relational constraints. <strong>Not established:</strong> production HTTPS, database/back-up encryption, privacy notice, retention schedule, lawful basis, or privacy-impact/legal review.</td>
+<td>Check deployed TLS and headers, cache behavior, cookie configuration, log redaction, least-privilege DB/storage access, data retention and deletion process, and disclosure boundaries. Determine applicable obligations under Republic Act No. 10173 and National Privacy Commission guidance; do not claim compliance without organizational/legal review.</td>
+</tr>
+<tr>
+<td>Email credentials and notification handling</td>
+<td><strong>Implemented:</strong> SMTP App Password is encrypted at rest using Laravel&#39;s encrypted cast and hidden from model serialization; Gmail transport uses port 587 and requires TLS; mail failure logging masks recipient/sensitive values; email test route is authenticated and rate limited. Email delivery is synchronous in the inspected receipt workflow. Real Gmail delivery was not verified.</td>
+<td>Inspect secret exposure in source, environment/config/cache, logs, model/API serialization, and exception output. Verify TLS negotiation and authorized recipient behavior in a controlled environment; do not include secret credentials in test evidence. Confirm failure/retry behavior and that SMTP failure does not falsely report successful delivery.</td>
+</tr>
+<tr>
+<td>Administrative audit and operational security</td>
+<td><strong>Implemented in part:</strong> an <code>AdminAuditLogger</code> and audit-log model/migration exist for selected administrative actions. <strong>[NEEDS VERIFICATION]:</strong> completeness of sensitive-action coverage, retention, access to logs, deployment monitoring, backup encryption, incident response, and patch cadence.</td>
+<td>Attempt unauthorized administrative actions; verify actor/action/subject evidence without passwords or SMTP secrets; assess log access, integrity, retention, alerting, dependency updates, and incident escalation. Compare controls with OWASP ASVS 5.0.0 and NIST SP 800-53 Rev. 5, Update 1 without asserting conformance (NIST, 2020; OWASP Foundation, n.d.).</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.2.7 Entity Relationship Diagram (ERD)</h2>
+<table><caption>Table 4.7. TindahanLedger domain data dictionary</caption>
+<thead><tr>
+<th>Entity (database table)</th>
+<th>Primary key</th>
+<th>Selected attributes and data types</th>
+<th>Relationships and constraints</th>
+</tr>
+</thead><tbody>
+<tr>
+<td><code>users</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>username</code> (string), <code>email</code> (string), <code>role</code> (string), <code>status</code> (string), <code>must_change_password</code> (boolean)</td>
+<td>Owns at most one store; configures email settings; referenced by administrative, credential, policy, purchase, and ledger audit fields.</td>
+</tr>
+<tr>
+<td><code>stores</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>owner_user_id</code> (bigint), <code>store_name</code> (string), <code>status</code> (string)</td>
+<td><code>owner_user_id</code> is unique; store has many customers, products, and purchases.</td>
+</tr>
+<tr>
+<td><code>customers</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>store_id</code> (bigint), <code>full_name</code> (string), <code>contact_number</code> (string), <code>email</code> (nullable string), <code>residential_landmark</code> (string), <code>credit_limit</code> and <code>current_balance</code> (decimal)</td>
+<td>Belongs to a store; email is unique within a store when populated; has ledger, payment, purchase, loyalty, credential, reminder, and debt-cycle records.</td>
+</tr>
+<tr>
+<td><code>ledger_entries</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>customer_id</code> (bigint), <code>kind</code> (string), <code>amount</code> and <code>running_balance</code> (decimal), <code>itemized_list</code> and <code>penalty_policy_snapshot</code> (JSON), transaction/deadline dates, <code>idempotency_key</code> (UUID)</td>
+<td>Belongs to a customer; can receive payment allocations; a penalty may reference one original entry through a unique self-reference.</td>
+</tr>
+<tr>
+<td><code>payments</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>customer_id</code> and <code>ledger_entry_id</code> (bigint), <code>amount</code> (decimal), <code>kind</code> (string), <code>payment_date</code> (date), <code>payment_batch_id</code> and <code>idempotency_key</code> (UUID)</td>
+<td>Belongs to a customer and ledger entry; a composite constraint enforces that the entry belongs to that customer; idempotency key is unique.</td>
+</tr>
+<tr>
+<td><code>products</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>store_id</code> (bigint), <code>name</code> and <code>normalized_name</code> (string), <code>unit_price</code> (decimal), <code>status</code> (string)</td>
+<td>Belongs to a store; normalized name is unique within the store; may appear in purchase items and store-scoped association rules.</td>
+</tr>
+<tr>
+<td><code>purchases</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>store_id</code>, nullable <code>customer_id</code>, nullable <code>ledger_entry_id</code> (bigint), <code>purchase_type</code> (string), <code>purchase_date</code> (date), <code>recorded_by_user_id</code> (bigint), <code>idempotency_key</code> (UUID)</td>
+<td>Belongs to a store; optional customer and ledger links distinguish walk-in cash purchases from credit-linked purchases; ledger link is unique.</td>
+</tr>
+<tr>
+<td><code>purchase_items</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>purchase_id</code>, <code>store_id</code>, <code>product_id</code> (bigint), <code>product_name_snapshot</code> (string), <code>quantity</code> (decimal), <code>unit_price_snapshot</code> and <code>line_total</code> (decimal)</td>
+<td>Belongs to a purchase and product; <code>(purchase_id, product_id)</code> is unique; composite keys enforce store consistency.</td>
+</tr>
+<tr>
+<td><code>store_email_settings</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>user_id</code> (bigint), <code>store_name</code>, <code>sender_email</code> (string), <code>smtp_app_password</code> (text)</td>
+<td><code>user_id</code> is unique; SMTP credential storage is protected by application encryption.</td>
+</tr>
+<tr>
+<td><code>store_penalty_policies</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>store_id</code> (bigint), <code>is_enabled</code> (boolean), <code>fee_cents</code> (integer), <code>grace_days</code> and <code>version</code> (integer), <code>effective_from</code> (date), <code>updated_by_user_id</code> (bigint)</td>
+<td>One policy per store; update actor references a user.</td>
+</tr>
+<tr>
+<td><code>suki_points</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>customer_id</code> (bigint), <code>points_balance</code> (integer), repayment remainder and cycle totals (integer/bigint)</td>
+<td>One balance row per customer through a unique customer reference.</td>
+</tr>
+<tr>
+<td><code>suki_point_transactions</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>customer_id</code>, <code>payment_id</code> (bigint), <code>transaction_type</code> (string), paid/redeemed amounts (bigint cents), awarded/redeemed points (integer)</td>
+<td>Belongs to a customer and payment; <code>payment_id</code> is unique; records earning or redemption history.</td>
+</tr>
+<tr>
+<td><code>debt_cycle_completions</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>customer_id</code>, nullable <code>completing_payment_id</code> (bigint), <code>cycle_number</code> and <code>streak_position</code> (integer), <code>repaid_cents</code> (bigint), <code>reward_points</code> (integer), <code>source</code> (string)</td>
+<td>Belongs to a customer; unique by customer/cycle number; completing payment is unique when present.</td>
+</tr>
+<tr>
+<td><code>customer_access_credentials</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>customer_id</code>, nullable <code>active_customer_id</code> (bigint), <code>token_hash</code> (string), <code>encrypted_token</code> (text), <code>status</code> (string), creator/revoker user IDs (bigint)</td>
+<td>Token hash is unique; unique nullable <code>active_customer_id</code> enforces at most one active credential per customer.</td>
+</tr>
+<tr>
+<td><code>email_reminder_logs</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>customer_id</code>, <code>ledger_entry_id</code> (bigint), <code>reminder_type</code> (string), <code>scheduled_reminder_date</code> (date), <code>outstanding_amount</code> (decimal), <code>delivery_status</code> (string), <code>attempt_count</code> (integer)</td>
+<td>Belongs to a customer and ledger entry; unique for ledger entry, reminder type, and scheduled date.</td>
+</tr>
+<tr>
+<td><code>admin_audit_logs</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>actor_user_id</code> (bigint), <code>action</code> and <code>subject_type</code> (string), <code>subject_id</code> (bigint), <code>details</code> (JSON)</td>
+<td>Actor references a user; <code>subject_type</code>/<code>subject_id</code> is polymorphic and has no subject foreign key.</td>
+</tr>
+<tr>
+<td><code>rule_sets</code></td>
+<td><code>id</code> (bigint)</td>
+<td>nullable <code>store_id</code> (bigint), <code>scope_type</code>, <code>scope_key</code>, <code>source_type</code>, <code>algorithm</code>, <code>algorithm_version</code>, <code>status</code> (string), <code>parameters</code> (JSON)</td>
+<td>A store can have rule sets; <code>active_scope_key</code> is unique; external experiments may have no store; <code>source_cutoff_purchase_id</code> is not a foreign key.</td>
+</tr>
+<tr>
+<td><code>association_rules</code></td>
+<td><code>id</code> (bigint)</td>
+<td><code>rule_set_id</code>, <code>store_id</code>, nullable product IDs (bigint), antecedent/consequent labels (string), counts (integer), support/confidence/lift (decimal)</td>
+<td>Belongs to a rule set; store/product composite references apply to store-scoped rules; label combinations are unique within a rule set.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.2.8 Database Normalization</h2>
+<table><caption>Table 4.8. Functional dependencies and normalization implications in TindahanLedger</caption>
+<thead><tr>
+<th>Relation and determinant</th>
+<th>Functional dependency supported by keys or business rules</th>
+<th>Normalization implication</th>
+</tr>
+</thead><tbody>
+<tr>
+<td><code>customers</code></td>
+<td><code>customer_id → store_id, full_name, contact_number, email, residential_landmark, credit_limit, current_balance</code>. For a non-null email, <code>(store_id, email) → customer_id</code> is enforced by a unique index.</td>
+<td>Customer profile facts are kept in one customer record rather than repeated in each credit or payment. Email uniqueness is tenant-scoped; nullable email means the alternate dependency applies only when populated.</td>
+</tr>
+<tr>
+<td><code>ledger_entries</code></td>
+<td><code>ledger_entry_id → customer_id, kind, amount, transaction_date, repayment_deadline, running_balance, note, penalty fields</code>. A non-null <code>penalty_for_entry_id</code> is unique.</td>
+<td>Each ledger row describes one credit or penalty for a customer. The unique self-reference permits at most one penalty entry per underlying entry.</td>
+</tr>
+<tr>
+<td><code>payments</code></td>
+<td><code>payment_id → ledger_entry_id, customer_id, amount, kind, payment_date, payment_batch_id, note</code>. A non-null <code>idempotency_key</code> is unique. Also, <code>ledger_entry_id → customer_id</code> in <code>ledger_entries</code>.</td>
+<td>The payment&#39;s <code>customer_id</code> is functionally derivable from its ledger entry, so it is a transitive/repeated value for a given allocation. The composite <code>(ledger_entry_id, customer_id)</code> foreign key intentionally stores and checks both to prevent mismatched-customer allocations.</td>
+</tr>
+<tr>
+<td><code>purchases</code> and <code>purchase_items</code></td>
+<td><code>purchase_id → store_id, customer_id, ledger_entry_id, purchase_type, purchase_date</code>. <code>(purchase_id, product_id) → quantity, product_name_snapshot, unit_price_snapshot, line_total, store_id</code> is unique at item level.</td>
+<td>Header/detail separation removes repeating product groups. <code>store_id</code> in <code>purchase_items</code> is also determined by <code>purchase_id</code>; it is retained for composite same-store foreign keys. Snapshot name and price represent values at the historical sale, not current <code>products</code> values.</td>
+</tr>
+<tr>
+<td><code>suki_point_transactions</code></td>
+<td><code>payment_id → customer_id, transaction_type, paid_amount_cents, points_awarded, points_redeemed, redeemed_amount_cents, remainder values</code>; <code>payment_id</code> is unique.</td>
+<td>Customer identity can be derived through the payment, so storing both identifiers duplicates a dependency. The migrations separately reference both rows; service logic associates the right customer and payment, but no composite customer/payment FK was found for this relation.</td>
+</tr>
+<tr>
+<td><code>products</code></td>
+<td><code>product_id → store_id, name, normalized_name, unit_price, description, status</code>; <code>(store_id, normalized_name) → product_id</code> is unique.</td>
+<td>Product facts are maintained in the catalog once. Purchase item snapshots remain intentionally independent so later catalog edits do not rewrite historical records.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.2.10 Maintenance Plan</h2>
+<table><caption>Table 4.9. TindahanLedger maintenance plan</caption>
+<thead><tr>
+<th>Maintenance Category</th>
+<th>Scheduled Plan and Operational Procedure</th>
+<th>What to Assess and Monitor</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Corrective maintenance and application errors</td>
+<td><strong>Proposed:</strong> review application errors after releases and investigate production incidents as they occur. Use the existing Laravel logging configuration; preserve sanitized error context and avoid recording credentials, QR tokens, or full customer financial details. Frequency, on-call role, and response targets are <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Error/exception rate, failed transactions, failed mail attempts, scheduler command failures, repeated validation failures, sensitive-data leakage in logs, and time to resolution.</td>
+</tr>
+<tr>
+<td>Database backup and recovery</td>
+<td><strong>Required operational plan; implementation not evidenced:</strong> choose a database backup method, schedule, encryption/access control, off-site retention, retention duration, and restore procedure before production records are entered. Perform and document restore tests at an approved interval.</td>
+<td>Backup completion/failure, recoverable point-in-time, restore-test outcome, integrity of customers/ledger/payments/purchases/points after restore, access to backup media, and approved recovery-point/recovery-time objectives. All intervals/objectives are <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Scheduler and background operations</td>
+<td><strong>Implemented schedules:</strong> <code>reminders:send-due</code> runs daily at 08:00 and <code>penalties:apply-due</code> runs daily at 00:30 in the configured application timezone; both use <code>withoutOverlapping</code> and <code>onOneServer</code>. <strong>Deployment procedure documented:</strong> configure system cron to invoke <code>php artisan schedule:run</code> each minute and confirm using <code>php artisan schedule:list</code>.</td>
+<td>Confirm cron/scheduler availability and timezone, command exit status, processed/sent/skipped/failed counts, duplicate reminder prevention, penalty eligibility, overlap/single-server lock behavior, and cache availability. A production cron installation has not been evidenced.</td>
+</tr>
+<tr>
+<td>SMTP and notification operations</td>
+<td><strong>Implemented functionality:</strong> owner-configured Gmail SMTP settings, receipts, and scheduled reminders; email settings are encrypted in storage. <strong>Proposed procedure:</strong> validate configuration after authorized credential rotation, use the controlled test-email feature, and verify delivery in the recipient mailbox. No actual delivery record was provided.</td>
+<td>TLS connection outcome, SMTP acceptance versus inbox delivery, invalid recipient handling, sanitized failure logs, reminder retries/duplicate behavior, and credential re-entry after key rotation. Do not retain App Passwords in issue trackers or reports.</td>
+</tr>
+<tr>
+<td>Security maintenance and access review</td>
+<td><strong>Proposed:</strong> review user/store status and privileged access at an institution-approved interval and after role/ownership changes; update supported PHP/Laravel/dependencies through reviewed changes; apply security fixes with regression tests. No approved interval or assigned security maintainer was found.</td>
+<td>Active accounts, role/store assignment, temporary-password completion, dependency advisories, patch status, secrets exposure, session and authorization regressions, audit-log coverage, and security-test findings.</td>
+</tr>
+<tr>
+<td>Schema and financial-integrity maintenance</td>
+<td><strong>Proposed:</strong> review each migration and rollback impact before applying it to a maintained environment; back up data before high-risk schema changes; run focused financial and migration tests, then the full suite in CI/release verification.</td>
+<td>Applied migration version, foreign-key/unique constraints, balance and payment reconciliation, idempotency behavior, rollback safety, target-engine compatibility, and data anomalies. Production MySQL/MariaDB migration state is <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>QR credentials and customer privacy</td>
+<td><strong>Implemented:</strong> credentials can be issued/replaced/revoked; revoked credentials are invalidated and their encrypted token is cleared. <strong>Proposed procedure:</strong> revoke exposed/returned credentials promptly, reissue through the authorized owner workflow, and follow the approved privacy incident process if financial data may have been disclosed.</td>
+<td>Active credential count/status, last-used metadata, revoked-token denial, customer/store status, idle-session expiry, QR distribution practices, private response headers, and incident handling. Formal incident/privacy procedures are <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Recommendation model and data quality</td>
+<td><strong>Implemented:</strong> store-scoped versioned models, validation/activation lifecycle, read-only analytics and evaluation commands; external data validation exists, but external basket import is explicitly not implemented. <strong>Proposed procedure:</strong> review model status and evaluation evidence before activation; train only on authorized, suitable store data and retain model/run metadata.</td>
+<td>Eligible basket count, rule validation, model failures, active/superseded version integrity, data suitability/licensing, evaluation split/coverage/hit metrics, and whether evidence is representative. Do not promote synthetic or unlicensed external data as validated sari-sari demand.</td>
+</tr>
+<tr>
+<td>Perfective maintenance and user feedback</td>
+<td><strong>Proposed:</strong> prioritize approved usability and capability changes as separate increments; preserve current regression tests and update documentation as behavior changes. No formal user-feedback log or approval cadence was found.</td>
+<td>Change requests, accepted/rejected rationale, usability evidence, regressions, performance against approved targets, accessibility findings, and alignment with stakeholder-approved requirements.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>4.2.12 PERT Chart</h2>
+<table><caption>Table 4.10. PERT input evidence required before calculation</caption>
+<thead><tr>
+<th>Required input</th>
+<th>Evidence needed</th>
+<th>Status</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Activity and scope</td>
+<td>Approved task list corresponding to project deliverables</td>
+<td>[NEEDS VERIFICATION]</td>
+</tr>
+<tr>
+<td>Duration</td>
+<td>Approved optimistic, most-likely, and pessimistic estimates if the selected PERT method uses three-point estimates; or another adviser-approved duration method</td>
+<td>[NEEDS VERIFICATION]</td>
+</tr>
+<tr>
+<td>Predecessors</td>
+<td>Jira dependency links or approved activity dependency list</td>
+<td>[NEEDS VERIFICATION]</td>
+</tr>
+<tr>
+<td>Calendar convention</td>
+<td>Working days or calendar days, project start baseline, and holidays/non-working time</td>
+<td>[NEEDS VERIFICATION]</td>
+</tr>
+<tr>
+<td>ES, EF, LS, LF, slack, and critical path</td>
+<td>Calculated from verified activity/duration/dependency inputs</td>
+<td>Not calculated; inputs are unavailable</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>Software requirements and development environment</h2>
+<table><caption>Table 4.11. TindahanLedger software requirements and development environment</caption>
+<thead><tr>
+<th>Component</th>
+<th>Evidence-based description</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Server-side runtime and framework</td>
+<td>PHP <code>^8.2</code> and Laravel <code>^12.0</code> are declared in <code>composer.json</code>. The installed package report identifies Laravel Framework 12.69.2. The local PHP CLI used for this documentation run reported PHP 8.2.12.</td>
+</tr>
+<tr>
+<td>Dependency and asset tools</td>
+<td>Composer manages PHP packages. <code>package.json</code> declares Vite 7 and Tailwind CSS 4 toolchain packages; the inspected local environment reports Vite 7.3.6, Tailwind CSS 4.3.3, and Node.js 24.21.0.</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>Laravel migrations and Eloquent define the relational schema. The audit handoff records that the active local database driver resolved to MySQL and that the listed migrations had run at the time of that audit. The README documents development measurements on MariaDB 10.4.32 under XAMPP on Windows. The final target database engine/version and production schema state are <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Automated-test database</td>
+<td><code>phpunit.xml</code> configures the test suite to use SQLite <code>:memory:</code>, an array cache/session, synchronous queue, and array mailer. This test arrangement is distinct from the local MariaDB development measurements and any future production database.</td>
+</tr>
+<tr>
+<td>Email transport</td>
+<td><code>.env.example</code> contains placeholder settings for Gmail SMTP using port 587 and TLS. Real credentials are not included. Gmail inbox delivery is not verified.</td>
+</tr>
+<tr>
+<td>Browser and network</td>
+<td>The application is accessed through a web browser. The README documents local Wi-Fi/hotspot QR testing instructions. The supported browser/device matrix and public network configuration are <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>Application modules</h2>
+<table><caption>Table 4.12. Implemented TindahanLedger application modules</caption>
+<thead><tr>
+<th>Module</th>
+<th>Prototype functionality</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Authentication and role-specific access</td>
+<td>Store Owner and Super Admin sign-in, role-restricted routes, account status checks, and required temporary-password change handling.</td>
+</tr>
+<tr>
+<td>Store and customer management</td>
+<td>Store and user administration; owner management of store customers and customer records.</td>
+</tr>
+<tr>
+<td>Credit ledger and payments</td>
+<td>Recording customer credit, viewing ledger history and balances, and recording cash payments allocated to outstanding entries.</td>
+</tr>
+<tr>
+<td>Product catalog and purchase records</td>
+<td>Store-scoped product management; structured item rows for credit-linked purchases; separate cash purchases with item and price snapshots.</td>
+</tr>
+<tr>
+<td>Customer QR self-service portal</td>
+<td>Owner-issued, replaceable, and revocable bearer credentials; customer read-only ledger and balance access. QR images are generated locally as SVG.</td>
+</tr>
+<tr>
+<td>Suki Points and late-payment controls</td>
+<td>Points accrual and redemption, debt-cycle records, store penalty settings, due-penalty processing, and supported waiver workflow.</td>
+</tr>
+<tr>
+<td>Email settings and reminders</td>
+<td>Owner-configured Gmail settings, test-message interface, credit/payment receipts, and scheduled repayment reminders. The underlying SMTP infrastructure is implemented, but real delivery is unverified.</td>
+</tr>
+<tr>
+<td>Analytics and recommendations</td>
+<td>Owner purchase analytics, transaction-entry suggestions based on store-scoped single-item association rules, and optional offline evaluation. Suggestions are advisory and do not modify a transaction automatically.</td>
+</tr>
+<tr>
+<td>Super Admin monitoring</td>
+<td>Store and user administration, transaction monitoring, and platform analytics.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>Implementation plan table</h2>
+<table><caption>Table 4.13. TindahanLedger infrastructure and deployment implementation plan</caption>
+<thead><tr>
+<th>Module</th>
+<th>Specific Objectives</th>
+<th>Hardware Requirements</th>
+<th>Software Requirements</th>
+<th>Duration</th>
+<th>Person Involved</th>
+<th>Estimated Budget</th>
+<th>Risk Assessment and Mitigation Strategies</th>
+<th>Evaluation and Monitoring</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Application hosting and access control</td>
+<td>Prepare the Laravel application for authorized Store Owner and Super Admin access and select a hosting arrangement.</td>
+<td>Browser-capable ordinary computer for administration; server/hosting capacity and redundancy <strong>[NEEDS VERIFICATION]</strong>. No dedicated POS hardware is evidenced.</td>
+<td>PHP 8.2-compatible runtime, Laravel 12 application, Composer-installed dependencies, web server, HTTPS/TLS, environment-specific secrets, and asset build. Hosting provider and versions <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Store Owner and Super Admin as operational roles; deployment implementer and approver <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Misconfiguration, exposed credentials, or unauthorized role access. Use protected secret configuration, HTTPS, least-privilege accounts, reviewed environment settings, and authentication/role regression checks before release.</td>
+<td>Record deployment version and configuration review; test owner/admin access, denied-role cases, TLS, and sanitized logs. Assign monitoring ownership and service targets <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Relational database and migration rollout</td>
+<td>Install the migration-defined schema and preserve store, customer, ledger, payment, product, purchase, and loyalty relationships.</td>
+<td>Persistent database storage, backup storage, and server resources <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>MySQL/MariaDB-compatible database and supported version <strong>[NEEDS VERIFICATION]</strong>; Laravel migrations. SQLite <code>:memory:</code> is the configured automated-test database, not evidence of production readiness.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Database/deployment administrator and reviewer <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Migration incompatibility, data loss, lock/concurrency differences, or failed restore. Review migrations, back up before rollout, validate constraints on the target engine, and conduct a documented restore test before accepting production records.</td>
+<td>Check migration status, foreign keys/unique constraints, balance reconciliation, backup completion, and restore-test evidence. Recovery objectives and monitoring intervals <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Customer and credit/payment ledger</td>
+<td>Configure and verify customer management, credit limits, credit entries, payment allocation, and balance summaries.</td>
+<td>Ordinary browser-capable owner device and network; server hardware <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Laravel web application, relational database, browser; automated tests currently use SQLite in memory.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Store Owner as operational user; implementer and financial-rule approver <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Duplicate submissions, incorrect balances, or cross-store record access. Retain idempotency and transaction safeguards; verify ledger/payment invariants, tenant isolation, and database concurrency on the approved target engine.</td>
+<td>Execute focused financial and tenant-isolation tests; reconcile representative ledger totals; retain test output and approval records. Test datasets and acceptance limits <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Product catalog, credit items, and cash purchases</td>
+<td>Maintain store-scoped product records and record purchase items without conflating cash sales with debt.</td>
+<td>Ordinary browser-capable owner device and network; server hardware <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Laravel, database, Blade/JavaScript interface, and compiled Vite assets.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Store Owner as operational user; implementer and acceptance reviewer <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Invalid or stale price/quantity data and duplicate sales. Validate catalog items and totals server-side, persist price/name snapshots, use idempotency keys, and test that cash purchases do not alter debt or points.</td>
+<td>Review product/purchase records and expected-total checks; run product catalog, structured-credit-item, and cash-purchase regression tests. Release acceptance criteria <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Customer QR self-service portal</td>
+<td>Enable an owner to issue/revoke QR credentials and a customer to view only their corresponding read-only ledger.</td>
+<td>Ordinary browser-capable device; phone camera/QR reader when opening by scan; internet or trusted local network. Exact device requirements <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Laravel portal routes and customer session, locally generated SVG QR, browser supporting the portal interface, configured <code>APP_URL</code>. Public domain/TLS <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Store Owner for credential administration; Customer for portal use; deployment implementer <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Credential disclosure could expose financial information. Use the existing credential issue/revoke lifecycle, private response headers, session controls, and read-only authorization; test on a trusted network before any public access.</td>
+<td>Record credential lifecycle and access-control test results; conduct an approved real-device/browser scan and verify revocation. Device matrix and privacy acceptance <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Gmail SMTP, receipts, and repayment reminders</td>
+<td>Configure mail delivery and the scheduler for supported receipts and due reminders.</td>
+<td>No dedicated mail hardware; application host must have network access to the configured SMTP service. Host/network policy <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Gmail SMTP using a Google App Password and TLS on the documented port; Laravel mail configuration; scheduler and cron or equivalent. Real credentials must remain outside source control.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Store Owner configures store email; mail/deployment administrator <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Invalid credentials, rejected/duplicate messages, or false assumptions that SMTP acceptance means inbox delivery. Use the test-message flow, inspect sanitized failure status, validate reminder deduplication/retry behavior, and verify recipient inbox delivery manually.</td>
+<td>Record test transport outcome separately from inbox receipt; monitor scheduled-command outcomes and reminder history. Mail provider, inbox verification, and schedule operations <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Suki Points and late-payment processing</td>
+<td>Verify point accrual/redemption and the configured due-penalty workflow with transaction records.</td>
+<td>Ordinary browser-capable owner device; server and persistent database requirements <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Laravel services, relational database, scheduler for due penalties, and supported browser.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Store Owner as operational user; implementation and business-rule approver <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Incorrect points or penalty totals can affect customer balances. Preserve atomic transaction processing, test earning/remainder/redemption and penalty rules, and require authorized policy approval before live activation.</td>
+<td>Reconcile point history, payment allocations, penalty eligibility, and balance changes; retain focused test results and policy approvals. Operational thresholds <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Analytics and product recommendations</td>
+<td>Deploy read-only purchase analytics and advisory suggestions using store-scoped records.</td>
+<td>Ordinary browser-capable owner device and network; server capacity <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Laravel analytics/recommendation services, relational purchase/product data, and Vite-built browser assets. No approved external basket dataset is required or established for live use.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Store Owner as user; data/model reviewer and implementer <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Sparse, synthetic, or nonrepresentative purchases may produce misleading suggestions. Label suggestions as advisory, monitor eligible basket counts and model status, and evaluate against an approved representative dataset before making effectiveness claims.</td>
+<td>Review eligibility counts, rule checks, and offline evaluation with dataset provenance and sample size. Real-store quality evaluation and acceptance thresholds <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+<tr>
+<td>Backup, monitoring, and operational handover</td>
+<td>Establish ongoing ownership, recovery, log monitoring, security updates, and release procedures.</td>
+<td>Backup and monitoring infrastructure <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td>Approved backup tool/storage, log/alerting service, scheduler, and dependency-update process <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Operational maintainer, incident contact, and data custodian <strong>[NEEDS VERIFICATION]</strong>.</td>
+<td><strong>[NEEDS VERIFICATION]</strong></td>
+<td>Unnoticed failures or unrecoverable data loss. Define access control, retention, recovery objectives, incident escalation, and restore testing before production operation.</td>
+<td>Review backup/restore records, scheduler and application errors, dependency advisories, access reviews, and incident records at an approved cadence <strong>[NEEDS VERIFICATION]</strong>.</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+<h2>Working Objective 6: Store-level analytics and advisory product suggestions</h2>
+<table><caption>Table 4.14. Local synthetic recommendation benchmark measurements</caption>
+<thead><tr>
+<th>Basket products</th>
+<th>Query count</th>
+<th>Service median / p95</th>
+<th>In-process HTTP median / p95</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>1</td>
+<td>5</td>
+<td>4.9 / 6.2 ms</td>
+<td>9.4 / 15.6 ms</td>
+</tr>
+<tr>
+<td>5</td>
+<td>5</td>
+<td>9.1 / 10.7 ms</td>
+<td>14.4 / 17.3 ms</td>
+</tr>
+<tr>
+<td>20</td>
+<td>5</td>
+<td>12.7 / 14.4 ms</td>
+<td>20.9 / 26.1 ms</td>
+</tr>
+<tr>
+<td>50</td>
+<td>5</td>
+<td>33.5 / 40.3 ms</td>
+<td>46.0 / 52.4 ms</td>
+</tr>
+</tbody>
+</table><p class="source">Source/note: Chapter 4 source draft. Refer to the surrounding section text for evidence limits and implementation status.</p>
+</body></html>

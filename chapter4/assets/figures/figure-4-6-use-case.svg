@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1720" height="1120" viewBox="0 0 1720 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.6. TindahanLedger use-case diagram</title>
+  <desc id="desc">The Store Owner, Super Admin, QR-access Customer, and Gmail SMTP are associated with implemented TindahanLedger use cases. The customer portal is read-only and the external email service is not an application user.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 26px; font-weight: 700; }
+      .boundary { fill: #fbfdff; stroke: #1d4d7a; stroke-width: 2.5; }
+      .usecase { fill: #ffffff; stroke: #47627b; stroke-width: 1.8; }
+      .uc { font-size: 13px; font-weight: 600; text-anchor: middle; }
+      .actor { stroke: #172033; stroke-width: 2.5; fill: none; }
+      .actorname { font-size: 15px; font-weight: 700; text-anchor: middle; }
+      .association { fill: none; stroke: #64748b; stroke-width: 1.4; }
+      .dependency { fill: none; stroke: #64748b; stroke-width: 1.5; stroke-dasharray: 6 5; }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1720" height="1120" fill="#ffffff"/>
+  <text class="title" x="860" y="42" text-anchor="middle">TindahanLedger use cases</text>
+  <rect class="boundary" x="330" y="95" width="1050" height="910" rx="8"/>
+  <text x="355" y="126" font-size="18" font-weight="700">TindahanLedger system boundary</text>
+
+  <!-- Associations use buses in the gaps between use-case columns to limit crossings. -->
+  <path class="association" d="M125 430 H305 V195 M305 195 V695"/>
+  <path class="association" d="M305 195 H365 M305 295 H365 M305 395 H365 M305 495 H365 M305 595 H365 M305 695 H365"/>
+  <path class="association" d="M305 145 H695 V695"/>
+  <path class="association" d="M695 195 H705 M695 295 H705 M695 395 H705 M695 495 H705 M695 595 H705 M695 695 H705"/>
+  <path class="association" d="M305 145 H1045 V195"/>
+  <!-- Super Admin associations. -->
+  <path class="association" d="M125 855 H285 V195 H365"/>
+  <path class="association" d="M285 855 H1400 V295 H1355 M1400 395 H1355"/>
+  <!-- Customer and Gmail associations. -->
+  <path class="association" d="M1510 610 H1400 V495 H1355"/>
+  <path class="association" d="M1510 800 H1400 V795 H1355"/>
+  <!-- Actors. -->
+  <g class="actor">
+    <circle cx="95" cy="385" r="20"/><path d="M95 405 V465 M60 430 H130 M95 465 L65 505 M95 465 L125 505"/>
+    <text class="actorname" x="95" y="535" stroke="none" fill="#172033">Store Owner</text>
+  </g>
+  <g class="actor">
+    <circle cx="95" cy="805" r="20"/><path d="M95 825 V885 M60 850 H130 M95 885 L65 925 M95 885 L125 925"/>
+    <text class="actorname" x="95" y="955" stroke="none" fill="#172033">Super Admin</text>
+  </g>
+  <g class="actor">
+    <circle cx="1580" cy="565" r="20"/><path d="M1580 585 V645 M1545 610 H1615 M1580 645 L1550 685 M1580 645 L1610 685"/>
+    <text class="actorname" x="1580" y="715" stroke="none" fill="#172033">QR-access</text>
+    <text class="actorname" x="1580" y="735" stroke="none" fill="#172033">Customer</text>
+  </g>
+  <g class="actor">
+    <circle cx="1580" cy="755" r="20"/><path d="M1580 775 V835 M1545 800 H1615 M1580 835 L1550 875 M1580 835 L1610 875"/>
+    <text class="actorname" x="1580" y="910" stroke="none" fill="#172033">Gmail SMTP</text>
+    <text class="actorname" x="1580" y="930" stroke="none" fill="#172033">(external service)</text>
+  </g>
+
+  <!-- Use cases: first column. -->
+  <ellipse class="usecase" cx="520" cy="195" rx="155" ry="34"/><text class="uc" x="520" y="200">Authenticate / change password</text>
+  <ellipse class="usecase" cx="520" cy="295" rx="155" ry="34"/><text class="uc" x="520" y="300">View owner dashboard</text>
+  <ellipse class="usecase" cx="520" cy="395" rx="155" ry="34"/><text class="uc" x="520" y="400">Manage customers</text>
+  <ellipse class="usecase" cx="520" cy="495" rx="155" ry="34"/><text class="uc" x="520" y="500">Manage product catalog</text>
+  <ellipse class="usecase" cx="520" cy="595" rx="155" ry="34"/><text class="uc" x="520" y="600">Record credit / view ledger</text>
+  <ellipse class="usecase" cx="520" cy="695" rx="155" ry="34"/><text class="uc" x="520" y="700">Record cash payment</text>
+
+  <!-- Use cases: second column. -->
+  <ellipse class="usecase" cx="860" cy="195" rx="155" ry="34"/><text class="uc" x="860" y="200">Record cash purchase</text>
+  <ellipse class="usecase" cx="860" cy="295" rx="155" ry="34"/><text class="uc" x="860" y="300">Redeem Suki Points</text>
+  <ellipse class="usecase" cx="860" cy="395" rx="155" ry="34"/><text class="uc" x="860" y="400">Manage QR credentials</text>
+  <ellipse class="usecase" cx="860" cy="495" rx="155" ry="34"/><text class="uc" x="860" y="500">Manage penalties / waivers</text>
+  <ellipse class="usecase" cx="860" cy="595" rx="155" ry="34"/><text class="uc" x="860" y="600">Configure email / test send</text>
+  <ellipse class="usecase" cx="860" cy="695" rx="155" ry="34"/><text class="uc" x="860" y="700">View overdue / purchase analytics</text>
+
+  <!-- Use cases: third column. -->
+  <ellipse class="usecase" cx="1200" cy="195" rx="155" ry="34"/><text class="uc" x="1200" y="200">Request advisory suggestions</text>
+  <ellipse class="usecase" cx="1200" cy="295" rx="155" ry="34"/><text class="uc" x="1200" y="300">Manage stores and users</text>
+  <ellipse class="usecase" cx="1200" cy="395" rx="155" ry="34"/><text class="uc" x="1200" y="400">Monitor platform / analytics</text>
+  <ellipse class="usecase" cx="1200" cy="495" rx="155" ry="34"/><text class="uc" x="1200" y="500">Open read-only QR portal</text>
+  <ellipse class="usecase" cx="1200" cy="795" rx="155" ry="34"/><text class="uc" x="1200" y="800">Send configured receipts / reminders</text>
+
+  <text class="note" x="350" y="955">Solid associations show actor access to functions. Credit/payment workflows and the email test action may request notifications.</text>
+  <text class="note" x="350" y="977">Source: verified routes, roles, and services. Customer portal is read-only; SMTP is a transport, not a system user.</text>
+  <text class="note" x="350" y="999">Caption: Figure 4.6. TindahanLedger use-case diagram.</text>
+</svg>

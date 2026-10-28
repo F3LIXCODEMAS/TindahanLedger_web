@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.1. Iterative and incremental development cycle applied to TindahanLedger</title>
+  <desc id="desc">Six stages show a ticketed requirement moving through analysis, design, implementation, testing, review, integration, and backlog refinement. Review may return the increment for revision.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1,1 L11,6 L1,11 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 25px; font-weight: 700; }
+      .node { fill: #f4f7fb; stroke: #1d4d7a; stroke-width: 2.5; rx: 18; }
+      .label { font-size: 19px; font-weight: 600; text-anchor: middle; }
+      .sub { font-size: 15px; text-anchor: middle; }
+      .line { fill: none; stroke: #334155; stroke-width: 2.4; marker-end: url(#arrow); }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1400" height="760" fill="#ffffff"/>
+  <text class="title" x="700" y="46" text-anchor="middle">Iterative and incremental development cycle</text>
+  <rect class="node" x="65" y="145" width="185" height="115"/>
+  <text class="label" x="157" y="188"><tspan x="157">Select and clarify</tspan><tspan x="157" dy="25">ticketed requirement</tspan></text>
+  <rect class="node" x="300" y="145" width="185" height="115"/>
+  <text class="label" x="392" y="188"><tspan x="392">Analyze constraints</tspan><tspan x="392" dy="25">and business rules</tspan></text>
+  <rect class="node" x="535" y="145" width="185" height="115"/>
+  <text class="label" x="627" y="188"><tspan x="627">Design affected</tspan><tspan x="627" dy="25">routes, data, UI</tspan></text>
+  <rect class="node" x="770" y="145" width="185" height="115"/>
+  <text class="label" x="862" y="188"><tspan x="862">Implement bounded</tspan><tspan x="862" dy="25">feature increment</tspan></text>
+  <rect class="node" x="1005" y="145" width="185" height="115"/>
+  <text class="label" x="1097" y="188"><tspan x="1097">Run unit, feature,</tspan><tspan x="1097" dy="25">regression tests</tspan></text>
+  <path class="line" d="M250 202 H294"/>
+  <path class="line" d="M485 202 H529"/>
+  <path class="line" d="M720 202 H764"/>
+  <path class="line" d="M955 202 H999"/>
+  <polygon points="1270,145 1350,202 1270,260 1190,202" fill="#fff8e6" stroke="#9a6700" stroke-width="2.5"/>
+  <text class="label" x="1270" y="197"><tspan x="1270">Evidence</tspan><tspan x="1270" dy="24">and review</tspan></text>
+  <path class="line" d="M1190 202 H1196"/>
+  <rect class="node" x="1005" y="390" width="250" height="112"/>
+  <text class="label" x="1130" y="433"><tspan x="1130">Integrate with existing</tspan><tspan x="1130" dy="25">application</tspan></text>
+  <text class="sub" x="1130" y="480">Formal approval evidence: not verified</text>
+  <rect class="node" x="600" y="390" width="250" height="112"/>
+  <text class="label" x="725" y="433"><tspan x="725">Refine backlog and</tspan><tspan x="725" dy="25">select next increment</tspan></text>
+  <path class="line" d="M1270 260 V330 H1130 V384"/>
+  <path class="line" d="M1005 446 H856"/>
+  <path class="line" d="M600 446 H392 V266"/>
+  <path class="line" d="M1270 260 V312 H862 V266"/>
+  <text class="sub" x="1050" y="308">Revise current increment</text>
+  <text class="note" x="54" y="706">Source: retrospective synthesis of ticket-named branches, commits, application code, and tests; not evidence of a documented approval gate.</text>
+  <text class="note" x="54" y="728">Caption: Figure 4.1. Iterative and incremental development cycle applied to TindahanLedger.</text>
+</svg>

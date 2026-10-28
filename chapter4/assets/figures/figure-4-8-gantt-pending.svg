@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="760" viewBox="0 0 1500 760" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.8. Gantt chart pending verified project schedule</title>
+  <desc id="desc">Placeholder showing required Gantt schedule fields. No task bars, durations, start dates, or end dates are supplied because an approved schedule was not available.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 25px; font-weight: 700; }
+      .cell { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.5; }
+      .head { fill: #eaf3fb; stroke: #1d4d7a; stroke-width: 1.5; }
+      .label { font-size: 16px; font-weight: 700; }
+      .body { font-size: 14px; }
+      .pending { font-size: 22px; font-weight: 700; fill: #8a4b08; }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1500" height="760" fill="#ffffff"/>
+  <text class="title" x="750" y="46" text-anchor="middle">Gantt schedule template - pending evidence</text>
+  <rect class="head" x="75" y="110" width="420" height="60"/><text class="label" x="95" y="147">Activity / deliverable</text>
+  <rect class="head" x="495" y="110" width="220" height="60"/><text class="label" x="515" y="147">Start date</text>
+  <rect class="head" x="715" y="110" width="220" height="60"/><text class="label" x="735" y="147">End date</text>
+  <rect class="head" x="935" y="110" width="210" height="60"/><text class="label" x="955" y="147">Duration</text>
+  <rect class="head" x="1145" y="110" width="280" height="60"/><text class="label" x="1165" y="147">Status / owner</text>
+  <g>
+    <rect class="cell" x="75" y="170" width="420" height="74"/><rect class="cell" x="495" y="170" width="220" height="74"/><rect class="cell" x="715" y="170" width="220" height="74"/><rect class="cell" x="935" y="170" width="210" height="74"/><rect class="cell" x="1145" y="170" width="280" height="74"/>
+    <rect class="cell" x="75" y="244" width="420" height="74"/><rect class="cell" x="495" y="244" width="220" height="74"/><rect class="cell" x="715" y="244" width="220" height="74"/><rect class="cell" x="935" y="244" width="210" height="74"/><rect class="cell" x="1145" y="244" width="280" height="74"/>
+    <rect class="cell" x="75" y="318" width="420" height="74"/><rect class="cell" x="495" y="318" width="220" height="74"/><rect class="cell" x="715" y="318" width="220" height="74"/><rect class="cell" x="935" y="318" width="210" height="74"/><rect class="cell" x="1145" y="318" width="280" height="74"/>
+    <rect class="cell" x="75" y="392" width="420" height="74"/><rect class="cell" x="495" y="392" width="220" height="74"/><rect class="cell" x="715" y="392" width="220" height="74"/><rect class="cell" x="935" y="392" width="210" height="74"/><rect class="cell" x="1145" y="392" width="280" height="74"/>
+    <rect class="cell" x="75" y="466" width="420" height="74"/><rect class="cell" x="495" y="466" width="220" height="74"/><rect class="cell" x="715" y="466" width="220" height="74"/><rect class="cell" x="935" y="466" width="210" height="74"/><rect class="cell" x="1145" y="466" width="280" height="74"/>
+  </g>
+  <text class="pending" x="750" y="625" text-anchor="middle">PENDING - no approved task schedule supplied</text>
+  <text class="note" x="75" y="675">GitHub commit dates are milestone timestamps only; they do not establish task start/end dates or durations.</text>
+  <text class="note" x="75" y="700">Caption: Figure 4.8. Gantt chart pending verified project schedule. Source: schedule inputs remain [NEEDS VERIFICATION].</text>
+</svg>

@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="1200" viewBox="0 0 1640 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.5(b). Loyalty, portal, notification, audit, and recommendation entities</title>
+  <desc id="desc">Migration-defined supporting tables with selected keys and cardinalities for loyalty, QR credentials, reminders, audit, and recommendation rules.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M1,1 L9,5 L1,9 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 25px; font-weight: 700; }
+      .box { fill: #ffffff; stroke: #1d4d7a; stroke-width: 2; }
+      .head { fill: #eaf3fb; stroke: #1d4d7a; stroke-width: 2; }
+      .name { font-size: 16px; font-weight: 700; }
+      .field { font-size: 12px; }
+      .line { fill: none; stroke: #475569; stroke-width: 1.8; marker-end: url(#arrow); }
+      .card { font-size: 12px; font-weight: 700; fill: #334155; }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1640" height="1200" fill="#ffffff"/>
+  <text class="title" x="820" y="42" text-anchor="middle">Loyalty, portal, notification, audit, and recommendation entities</text>
+  <path class="line" d="M330 155 H390"/><text class="card" x="333" y="145">1 : 0..1</text>
+  <path class="line" d="M695 625 H755"/><text class="card" x="698" y="615">1 : 0..*</text>
+  <path class="line" d="M1060 625 H1120"/><text class="card" x="1063" y="615">1 : 0..*</text>
+
+  <g transform="translate(30 90)">
+    <rect class="box" width="300" height="130"/><rect class="head" width="300" height="32"/>
+    <text class="name" x="12" y="22">customers (reference)</text>
+    <text class="field" x="12" y="55">PK id; FK store_id; full_name</text><text class="field" x="12" y="78">Customer parent for loyalty, portal,</text><text class="field" x="12" y="99">reminder, and debt-cycle records</text>
+  </g>
+  <g transform="translate(390 90)">
+    <rect class="box" width="305" height="130"/><rect class="head" width="305" height="32"/>
+    <text class="name" x="12" y="22">suki_points</text>
+    <text class="field" x="12" y="55">PK id; unique FK customer_id</text><text class="field" x="12" y="78">points_balance; repayment remainders;</text><text class="field" x="12" y="99">cycle and streak totals</text>
+  </g>
+  <g transform="translate(755 90)">
+    <rect class="box" width="305" height="130"/><rect class="head" width="305" height="32"/>
+    <text class="name" x="12" y="22">suki_point_transactions</text>
+    <text class="field" x="12" y="55">PK id; FK customer_id, payment_id</text><text class="field" x="12" y="78">unique payment_id; type, paid/redeemed</text><text class="field" x="12" y="99">amounts, points, recorded_by_user_id</text>
+  </g>
+  <g transform="translate(1120 90)">
+    <rect class="box" width="440" height="130"/><rect class="head" width="440" height="32"/>
+    <text class="name" x="12" y="22">debt_cycle_completions</text>
+    <text class="field" x="12" y="55">PK id; FK customer_id; nullable completing_payment_id</text><text class="field" x="12" y="78">unique customer_id/cycle_number; streak_position</text><text class="field" x="12" y="99">repaid_cents, reward_points, source, completed_at</text>
+  </g>
+
+  <g transform="translate(30 260)">
+    <rect class="box" width="300" height="130"/><rect class="head" width="300" height="32"/>
+    <text class="name" x="12" y="22">users (reference)</text>
+    <text class="field" x="12" y="55">PK id; username; role</text><text class="field" x="12" y="78">Actor for admin audit and credential</text><text class="field" x="12" y="99">creation/revocation metadata</text>
+  </g>
+  <g transform="translate(390 260)">
+    <rect class="box" width="305" height="160"/><rect class="head" width="305" height="32"/>
+    <text class="name" x="12" y="22">admin_audit_logs</text>
+    <text class="field" x="12" y="55">PK id; FK actor_user_id</text><text class="field" x="12" y="78">action, subject_type, subject_id</text><text class="field" x="12" y="101">details (JSON)</text><text class="field" x="12" y="124">Polymorphic subject has no FK</text>
+  </g>
+  <g transform="translate(755 260)">
+    <rect class="box" width="305" height="160"/><rect class="head" width="305" height="32"/>
+    <text class="name" x="12" y="22">customer_access_credentials</text>
+    <text class="field" x="12" y="55">PK id; FK customer_id; active_customer_id</text><text class="field" x="12" y="78">unique token_hash; encrypted_token</text><text class="field" x="12" y="101">status; created_by/revoked_by user IDs</text><text class="field" x="12" y="124">unique nullable active_customer_id</text>
+  </g>
+  <g transform="translate(1120 260)">
+    <rect class="box" width="440" height="160"/><rect class="head" width="440" height="32"/>
+    <text class="name" x="12" y="22">email_reminder_logs</text>
+    <text class="field" x="12" y="55">PK id; FK customer_id, ledger_entry_id</text><text class="field" x="12" y="78">reminder_type, scheduled_reminder_date</text><text class="field" x="12" y="101">outstanding_amount, delivery_status, attempt_count</text><text class="field" x="12" y="124">unique ledger/type/scheduled-date tuple</text>
+  </g>
+
+  <g transform="translate(390 545)">
+    <rect class="box" width="305" height="160"/><rect class="head" width="305" height="32"/>
+    <text class="name" x="12" y="22">stores (reference)</text>
+    <text class="field" x="12" y="55">PK id; store_name</text><text class="field" x="12" y="78">Rule-set scope for store models</text><text class="field" x="12" y="101">External experiment rule sets may</text><text class="field" x="12" y="124">have a null store_id</text>
+  </g>
+  <g transform="translate(755 545)">
+    <rect class="box" width="305" height="160"/><rect class="head" width="305" height="32"/>
+    <text class="name" x="12" y="22">rule_sets</text>
+    <text class="field" x="12" y="55">PK id; nullable FK store_id</text><text class="field" x="12" y="78">scope, source, algorithm/version, status</text><text class="field" x="12" y="101">parameters (JSON); unique active_scope_key</text><text class="field" x="12" y="124">source_cutoff_purchase_id is not an FK</text>
+  </g>
+  <g transform="translate(1120 545)">
+    <rect class="box" width="440" height="160"/><rect class="head" width="440" height="32"/>
+    <text class="name" x="12" y="22">association_rules</text>
+    <text class="field" x="12" y="55">PK id; FK rule_set_id; store_id discriminator</text><text class="field" x="12" y="78">optional product IDs or external labels</text><text class="field" x="12" y="101">antecedent/consequent counts, support,</text><text class="field" x="12" y="124">confidence, lift; tuple uniqueness</text>
+  </g>
+
+  <text class="note" x="30" y="790">Relationship cardinalities from migration keys: customers 1:0..1 suki_points; customers 1:0..* point transactions, cycle completions, credentials, and reminder logs.</text>
+  <text class="note" x="30" y="815">Each Suki Point transaction references one unique payment; a debt-cycle completion may reference one unique payment; reminder logs reference a customer, ledger entry, and unique schedule tuple.</text>
+  <text class="note" x="30" y="840">Users act on audit/credential records; stores 1:0..* rule_sets; rule_sets 1:0..* association_rules. Store-scoped rules may reference products; external rules use labels.</text>
+  <text class="note" x="30" y="865">Reference entities are repeated only for readability; they are the same tables as in Figure 4.5(a), not additional entities. Some non-obvious associations are stated above rather than drawn as crossing lines.</text>
+  <text class="note" x="30" y="890">Framework tables, timestamps, and secondary indexes are omitted. Source: database migrations and models.</text>
+  <text class="note" x="30" y="915">Caption: Figure 4.5(b). Loyalty, portal, notification, audit, and recommendation entities.</text>
+</svg>

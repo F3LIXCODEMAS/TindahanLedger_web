@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.2. Context diagram of the TindahanLedger system</title>
+  <desc id="desc">TindahanLedger interacts with the Store Owner, Super Admin, QR-access Customer, and configured Gmail SMTP. The central box represents the whole Laravel application.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1,1 L11,6 L1,11 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 27px; font-weight: 700; }
+      .actor { fill: #f7f9fc; stroke: #475569; stroke-width: 2.4; rx: 16; }
+      .system { fill: #eaf3fb; stroke: #1d4d7a; stroke-width: 3; rx: 22; }
+      .name { font-size: 22px; font-weight: 700; text-anchor: middle; }
+      .detail { font-size: 16px; text-anchor: middle; }
+      .flow { fill: none; stroke: #334155; stroke-width: 2.3; marker-end: url(#arrow); }
+      .flowlabel { font-size: 14px; fill: #334155; text-anchor: middle; }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1500" height="900" fill="#ffffff"/>
+  <text class="title" x="750" y="48" text-anchor="middle">TindahanLedger system context</text>
+  <rect class="actor" x="55" y="165" width="290" height="150"/>
+  <text class="name" x="200" y="220">Store Owner</text>
+  <text class="detail" x="200" y="255"><tspan x="200">Credit, payments, catalog, settings,</tspan><tspan x="200" dy="23">QR credentials, analytics requests</tspan></text>
+  <rect class="actor" x="55" y="565" width="290" height="150"/>
+  <text class="name" x="200" y="620">Super Admin</text>
+  <text class="detail" x="200" y="655"><tspan x="200">Store/user administration, monitoring,</tspan><tspan x="200" dy="23">platform analytics requests</tspan></text>
+  <rect class="system" x="510" y="300" width="480" height="300"/>
+  <text class="name" x="750" y="395">TindahanLedger</text>
+  <text class="detail" x="750" y="438"><tspan x="750">Laravel web application</tspan><tspan x="750" dy="28">Role-scoped store operations,</tspan><tspan x="750" dy="24">financial records, customer portal,</tspan><tspan x="750" dy="24">notifications and advisory analytics</tspan></text>
+  <rect class="actor" x="1155" y="165" width="290" height="150"/>
+  <text class="name" x="1300" y="220">Customer</text>
+  <text class="detail" x="1300" y="255"><tspan x="1300">Issued QR bearer token;</tspan><tspan x="1300" dy="23">read-only portal request</tspan></text>
+  <rect class="actor" x="1155" y="565" width="290" height="150"/>
+  <text class="name" x="1300" y="620">Configured Gmail SMTP</text>
+  <text class="detail" x="1300" y="655"><tspan x="1300">Transport acceptance</tspan><tspan x="1300" dy="23">or failure; inbox delivery unverified</tspan></text>
+  <path class="flow" d="M345 215 H500"/>
+  <path class="flow" d="M500 275 H345"/>
+  <text class="flowlabel" x="420" y="195">Requests / credentials</text>
+  <text class="flowlabel" x="420" y="300">Views / results</text>
+  <path class="flow" d="M345 615 H500"/>
+  <path class="flow" d="M500 565 H345"/>
+  <text class="flowlabel" x="420" y="548">Administration results</text>
+  <text class="flowlabel" x="420" y="642">Admin requests</text>
+  <path class="flow" d="M1000 215 H1145"/>
+  <path class="flow" d="M1145 275 H1000"/>
+  <text class="flowlabel" x="1075" y="195">Portal response</text>
+  <text class="flowlabel" x="1075" y="300">QR token / read request</text>
+  <path class="flow" d="M990 555 H1145"/>
+  <path class="flow" d="M1145 615 H990"/>
+  <text class="flowlabel" x="1070" y="535">Messages</text>
+  <text class="flowlabel" x="1070" y="646">SMTP status</text>
+  <text class="note" x="55" y="818">Note: The customer portal is read-only; possession of a QR bearer credential is not identity verification.</text>
+  <text class="note" x="55" y="840">Source: verified application routes, roles, mail configuration, and portal behavior. Caption: Figure 4.2. Context diagram of the TindahanLedger system.</text>
+</svg>

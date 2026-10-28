@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="760" viewBox="0 0 1500 760" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.9. PERT network and critical-path calculations pending verified inputs</title>
+  <desc id="desc">No activity network or calculated early/late times are shown because task duration estimates and predecessor relationships were not available.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 25px; font-weight: 700; }
+      .panel { fill: #f8fafc; stroke: #94a3b8; stroke-width: 2; rx: 16; }
+      .pending { font-size: 22px; font-weight: 700; fill: #8a4b08; text-anchor: middle; }
+      .label { font-size: 16px; font-weight: 700; }
+      .body { font-size: 15px; }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1500" height="760" fill="#ffffff"/>
+  <text class="title" x="750" y="46" text-anchor="middle">PERT network - pending verified inputs</text>
+  <rect class="panel" x="110" y="110" width="1280" height="455"/>
+  <text class="pending" x="750" y="178">PENDING - no approved activity network can be calculated</text>
+  <text class="label" x="185" y="250">Required before calculation:</text>
+  <text class="body" x="205" y="292">1. Approved activity list and defined project scope</text>
+  <text class="body" x="205" y="332">2. Approved duration estimates and a consistent time unit</text>
+  <text class="body" x="205" y="372">3. Verified predecessor/dependency relationships</text>
+  <text class="body" x="205" y="412">4. Calendar convention and project baseline</text>
+  <text class="body" x="205" y="472">ES, EF, LS, LF, slack, and critical path: NOT CALCULATED</text>
+  <text class="note" x="75" y="625">The commit milestone timeline is not a substitute for task duration or dependency evidence.</text>
+  <text class="note" x="75" y="650">Caption: Figure 4.9. PERT network and critical-path calculations pending verified inputs.</text>
+  <text class="note" x="75" y="675">Source: project duration/dependency inputs remain [NEEDS VERIFICATION].</text>
+</svg>

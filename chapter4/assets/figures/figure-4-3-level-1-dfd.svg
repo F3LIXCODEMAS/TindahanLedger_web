@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1380" viewBox="0 0 1900 1380" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.3. Level 1 data flow diagram for TindahanLedger</title>
+  <desc id="desc">Level 1 processes cover authentication, customer/product management, credit, payments and points, cash purchases, QR portal, mail, recommendations, and reporting. Data stores name actual migration-defined tables.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M1,1 L9,5 L1,9 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 26px; font-weight: 700; }
+      .entity { fill: #f8fafc; stroke: #475569; stroke-width: 2; rx: 10; }
+      .proc { fill: #eaf3fb; stroke: #1d4d7a; stroke-width: 2.5; rx: 28; }
+      .store { fill: #fff8e6; stroke: #9a6700; stroke-width: 2; }
+      .head { font-size: 17px; font-weight: 700; text-anchor: middle; }
+      .label { font-size: 14px; text-anchor: middle; }
+      .small { font-size: 12px; fill: #334155; }
+      .flow { fill: none; stroke: #475569; stroke-width: 1.8; marker-end: url(#arrow); }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1900" height="1280" fill="#ffffff"/>
+  <text class="title" x="950" y="42" text-anchor="middle">Level 1 data flow diagram</text>
+  <text class="small" x="75" y="82">External entities</text>
+  <text class="small" x="690" y="82">Processes</text>
+  <text class="small" x="1450" y="82">Migration-defined data stores</text>
+
+  <rect class="entity" x="55" y="125" width="235" height="95"/><text class="head" x="172" y="168">Store Owner</text><text class="label" x="172" y="194">operational requests</text>
+  <rect class="entity" x="55" y="270" width="235" height="95"/><text class="head" x="172" y="313">Super Admin</text><text class="label" x="172" y="339">admin/report requests</text>
+  <rect class="entity" x="55" y="415" width="235" height="95"/><text class="head" x="172" y="458">QR-access Customer</text><text class="label" x="172" y="484">read-only portal request</text>
+  <rect class="entity" x="55" y="560" width="235" height="95"/><text class="head" x="172" y="603">Gmail SMTP</text><text class="label" x="172" y="629">external mail transport</text>
+
+  <rect class="proc" x="570" y="105" width="360" height="100"/><text class="head" x="750" y="146">1.0 Authenticate and authorize</text><text class="label" x="750" y="176">owner / admin identity, role, status</text>
+  <rect class="proc" x="570" y="230" width="360" height="100"/><text class="head" x="750" y="271">2.0 Manage stores, customers, products</text><text class="label" x="750" y="301">store-scoped records and catalog</text>
+  <rect class="proc" x="570" y="355" width="360" height="100"/><text class="head" x="750" y="396">3.0 Record credit and item details</text><text class="label" x="750" y="426">ledger entry; optional utang purchase</text>
+  <rect class="proc" x="570" y="480" width="360" height="100"/><text class="head" x="750" y="521">4.0 Process cash payments and points</text><text class="label" x="750" y="551">allocations, balance, earning/redemption</text>
+  <rect class="proc" x="570" y="605" width="360" height="100"/><text class="head" x="750" y="646">5.0 Record cash purchases</text><text class="label" x="750" y="676">purchase snapshots; no debt/points</text>
+  <rect class="proc" x="570" y="730" width="360" height="100"/><text class="head" x="750" y="771">6.0 Serve customer QR portal</text><text class="label" x="750" y="801">validate bearer token; read-only ledger</text>
+  <rect class="proc" x="570" y="855" width="360" height="100"/><text class="head" x="750" y="896">7.0 Send receipts and reminders</text><text class="label" x="750" y="926">configured SMTP delivery attempt</text>
+  <rect class="proc" x="570" y="980" width="360" height="100"/><text class="head" x="750" y="1021">8.0 Recommend and report</text><text class="label" x="750" y="1051">store-scoped rules and analytics</text>
+
+  <path class="store" d="M1225 100 h555 v90 h-555 z"/><text class="head" x="1502" y="133">D1 users; stores</text><text class="label" x="1502" y="163">roles, ownership and store status</text>
+  <path class="store" d="M1225 220 h555 v90 h-555 z"/><text class="head" x="1502" y="253">D2 customers; products</text><text class="label" x="1502" y="283">profiles, limits, catalog</text>
+  <path class="store" d="M1225 340 h555 v90 h-555 z"/><text class="head" x="1502" y="373">D3 ledger_entries</text><text class="label" x="1502" y="403">credit and penalty entries</text>
+  <path class="store" d="M1225 460 h555 v90 h-555 z"/><text class="head" x="1502" y="493">D4 payments</text><text class="label" x="1502" y="523">cash and points allocations</text>
+  <path class="store" d="M1225 580 h555 v90 h-555 z"/><text class="head" x="1502" y="613">D5 purchases; purchase_items</text><text class="label" x="1502" y="643">credit details and cash sales</text>
+  <path class="store" d="M1225 700 h555 v90 h-555 z"/><text class="head" x="1502" y="733">D6 Suki Points; debt cycles</text><text class="label" x="1502" y="763">balances and point history</text>
+  <path class="store" d="M1225 820 h555 v90 h-555 z"/><text class="head" x="1502" y="853">D7 customer_access_credentials</text><text class="label" x="1502" y="883">issued/revoked bearer credential</text>
+  <path class="store" d="M1225 940 h555 v90 h-555 z"/><text class="head" x="1502" y="973">D8 store_email_settings; email_reminder_logs</text><text class="label" x="1502" y="1003">configuration and delivery records</text>
+  <path class="store" d="M1225 1060 h555 v90 h-555 z"/><text class="head" x="1502" y="1093">D9 rule_sets; association_rules</text><text class="label" x="1502" y="1123">versioned advisory models</text>
+  <path class="store" d="M1225 1170 h265 v80 h-265 z"/><text class="head" x="1357" y="1200">D10 store_penalty_policies</text><text class="label" x="1357" y="1227">store-level late-fee policy</text>
+  <path class="store" d="M1515 1170 h265 v80 h-265 z"/><text class="head" x="1647" y="1200">D11 admin_audit_logs</text><text class="label" x="1647" y="1227">selected admin actions</text>
+
+  <path class="flow" d="M290 165 H560"/><path class="flow" d="M290 310 H500 V155 H560"/>
+  <path class="flow" d="M930 155 H1215"/><path class="flow" d="M1215 175 H940"/>
+  <path class="flow" d="M290 165 H470 V280 H560"/>
+  <path class="flow" d="M930 280 H1215"/><path class="flow" d="M1215 295 H940"/>
+  <path class="flow" d="M930 405 H1215"/><path class="flow" d="M1215 420 H940"/>
+  <path class="flow" d="M930 530 H1215"/><path class="flow" d="M1215 540 H940"/>
+  <path class="flow" d="M930 655 H1215"/><path class="flow" d="M1215 660 H940"/>
+  <path class="flow" d="M290 460 H485 V780 H560"/><path class="flow" d="M930 780 H1215"/>
+  <path class="flow" d="M290 605 H480 V905 H560"/><path class="flow" d="M930 905 H1215"/>
+  <path class="flow" d="M290 165 H455 V1030 H560"/><path class="flow" d="M930 1030 H1215"/>
+  <path class="flow" d="M930 1035 H1160 V640 H1215"/>
+  <path class="flow" d="M930 530 H1175 V745 H1215"/>
+  <path class="flow" d="M560 885 H500 V605 H290"/>
+  <path class="flow" d="M930 280 H1180 V1210 H1505"/>
+  <path class="flow" d="M1215 1210 H1195 V405 H940"/>
+  <text class="note" x="55" y="1300">Flows are summarized from application routes/services. Cash purchases are separate from debt and Suki Points; SMTP acceptance is not inbox-delivery evidence.</text>
+  <text class="note" x="55" y="1325">Source: migration-defined application tables and verified workflows. Caption: Figure 4.3. Level 1 data flow diagram for TindahanLedger.</text>
+</svg>

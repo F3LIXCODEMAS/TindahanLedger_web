@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1080" viewBox="0 0 1700 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.7. Dated GitHub branch-head commit milestones identified for TindahanLedger</title>
+  <desc id="desc">Chronological list of selected dated GitHub branch-head commit records from September 28 through October 26, 2026. Dates are commit dates, not task creation dates or durations.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 25px; font-weight: 700; }
+      .axis { stroke: #1d4d7a; stroke-width: 4; }
+      .dot { fill: #1d4d7a; stroke: #ffffff; stroke-width: 2; }
+      .row { fill: #f7f9fc; stroke: #d7e0ea; stroke-width: 1.2; rx: 8; }
+      .date { font-size: 15px; font-weight: 700; }
+      .branch { font-size: 13px; font-weight: 700; }
+      .msg { font-size: 13px; }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1700" height="1080" fill="#ffffff"/>
+  <text class="title" x="850" y="42" text-anchor="middle">Dated GitHub branch-head commit milestones</text>
+  <line class="axis" x1="120" y1="110" x2="120" y2="840"/>
+
+  <g><circle class="dot" cx="120" cy="135" r="10"/><rect class="row" x="160" y="105" width="1475" height="58"/>
+    <text class="date" x="180" y="129">2026-09-28 UTC</text><text class="branch" x="380" y="127">DUMS-21 database foundation</text><text class="msg" x="760" y="127">"DUMS-21 Add database and repayment-based Suki points"</text></g>
+  <g><circle class="dot" cx="120" cy="205" r="10"/><rect class="row" x="160" y="175" width="1475" height="58"/>
+    <text class="date" x="180" y="199">2026-10-01 UTC</text><text class="branch" x="380" y="197">DUMS-22 login / Sprint 1</text><text class="msg" x="760" y="197">"Complete Sprint 1 ledger workflows"</text></g>
+  <g><circle class="dot" cx="120" cy="275" r="10"/><rect class="row" x="160" y="245" width="1475" height="58"/>
+    <text class="date" x="180" y="269">2026-10-15 UTC</text><text class="branch" x="380" y="267">DUMS-30 receipts</text><text class="msg" x="760" y="267">"all changes for dums DUMS-30-Instant-Digital-Transaction-Receipts"</text></g>
+  <g><circle class="dot" cx="120" cy="345" r="10"/><rect class="row" x="160" y="315" width="1475" height="58"/>
+    <text class="date" x="180" y="339">2026-10-15 UTC</text><text class="branch" x="380" y="337">DUMS-32 overdue accounts</text><text class="msg" x="760" y="337">"new changes for overdue acc collectibles"</text></g>
+  <g><circle class="dot" cx="120" cy="415" r="10"/><rect class="row" x="160" y="385" width="1475" height="58"/>
+    <text class="date" x="180" y="409">2026-10-16 UTC</text><text class="branch" x="380" y="407">QR Customer Self-Service Portal</text><text class="msg" x="760" y="407">"commit on the customer self sericve portal with qr code"</text></g>
+  <g><circle class="dot" cx="120" cy="485" r="10"/><rect class="row" x="160" y="455" width="1475" height="58"/>
+    <text class="date" x="180" y="479">2026-10-17 UTC</text><text class="branch" x="380" y="477">Late-Payment-Penalties</text><text class="msg" x="760" y="477">"Late payment penalties: configurable policy, daily fee application, waivers"</text></g>
+  <g><circle class="dot" cx="120" cy="555" r="10"/><rect class="row" x="160" y="525" width="1475" height="58"/>
+    <text class="date" x="180" y="549">2026-10-17 UTC</text><text class="branch" x="380" y="547">Suki loyalty engine</text><text class="msg" x="760" y="547">"Suki Points loyalty engine: three-cycle reward with cycle history"</text></g>
+  <g><circle class="dot" cx="120" cy="625" r="10"/><rect class="row" x="160" y="595" width="1475" height="58"/>
+    <text class="date" x="180" y="619">2026-10-20 UTC</text><text class="branch" x="380" y="617">main branch integration</text><text class="msg" x="760" y="617">"Merge pull request #5 ... Late fee integration"</text></g>
+  <g><circle class="dot" cx="120" cy="695" r="10"/><rect class="row" x="160" y="665" width="1475" height="58"/>
+    <text class="date" x="180" y="689">2026-10-23 UTC</text><text class="branch" x="380" y="687">DUMS-38 external validation</text><text class="msg" x="760" y="687">"DUMS-38: External basket dataset validation"</text></g>
+  <g><circle class="dot" cx="120" cy="765" r="10"/><rect class="row" x="160" y="735" width="1475" height="58"/>
+    <text class="date" x="180" y="759">2026-10-25 UTC</text><text class="branch" x="380" y="757">AteTindera chatbot</text><text class="msg" x="760" y="757">"Update AteTindera chatbot buttons"</text></g>
+  <g><circle class="dot" cx="120" cy="835" r="10"/><rect class="row" x="160" y="805" width="1475" height="58"/>
+    <text class="date" x="180" y="829">2026-10-26 UTC</text><text class="branch" x="380" y="827">DUMS-41 branch head</text><text class="msg" x="760" y="827">"Seed existing stores from Mang Arthur catalog" (branch/task mismatch)</text></g>
+
+  <text class="note" x="70" y="915">These are selected commit timestamps from branch-head records, not branch creation dates, Jira issue creation dates, task durations, or a complete activity history.</text>
+  <text class="note" x="70" y="940">Branch names and head commit subjects do not always align. The DUMS-41 branch-head subject, for example, describes catalog seeding.</text>
+  <text class="note" x="70" y="965">No task durations or dependency relationships are inferred. Source: GitHub commit metadata for F3LIXCODEMAS/TindahanLedger_web.</text>
+  <text class="note" x="70" y="990">Caption: Figure 4.7. Dated GitHub branch-head commit milestones identified for TindahanLedger.</text>
+</svg>

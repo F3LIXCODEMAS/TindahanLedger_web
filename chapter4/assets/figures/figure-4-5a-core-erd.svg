@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1540" height="1120" viewBox="0 0 1540 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 4.5(a). Core store, customer, ledger, catalog, and purchase entities</title>
+  <desc id="desc">Migration-defined core tables with selected primary keys, foreign keys, business attributes, unique constraints, and relationship cardinalities.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M1,1 L9,5 L1,9 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .title { font-size: 25px; font-weight: 700; }
+      .box { fill: #ffffff; stroke: #1d4d7a; stroke-width: 2; }
+      .head { fill: #eaf3fb; stroke: #1d4d7a; stroke-width: 2; }
+      .name { font-size: 17px; font-weight: 700; }
+      .field { font-size: 13px; }
+      .line { fill: none; stroke: #475569; stroke-width: 1.8; marker-end: url(#arrow); }
+      .card { font-size: 12px; font-weight: 700; fill: #334155; }
+      .note { font-size: 13px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1540" height="1120" fill="#ffffff"/>
+  <text class="title" x="770" y="42" text-anchor="middle">Core store, customer, ledger, catalog, and purchase entities</text>
+
+  <!-- Relationship connectors are behind the entity boxes. -->
+  <path class="line" d="M300 176 H350"/><text class="card" x="307" y="166">1 : 0..1</text>
+  <path class="line" d="M605 176 H655"/><text class="card" x="612" y="166">1 : 0..*</text>
+  <path class="line" d="M910 176 H960"/><text class="card" x="917" y="166">1 : 0..*</text>
+  <path class="line" d="M175 260 V380"/><text class="card" x="182" y="327">1 : 0..1</text>
+  <path class="line" d="M480 260 V380"/><text class="card" x="488" y="327">1 : 0..*</text>
+  <path class="line" d="M785 260 V380"/><text class="card" x="793" y="327">1 : 0..*</text>
+  <path class="line" d="M480 260 V345 H1090 V380"/><text class="card" x="760" y="337">store 1 : 0..1 policy</text>
+  <path class="line" d="M1090 260 V320 H785 V380"/><text class="card" x="890" y="312">entry/customer 1 : 0..* payments</text>
+  <path class="line" d="M480 545 V665"/><text class="card" x="488" y="610">product 1 : 0..*</text>
+  <path class="line" d="M300 747 H350"/><text class="card" x="302" y="737">1 : 1..*</text>
+
+  <g transform="translate(45 95)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">users</text>
+    <text class="field" x="12" y="58">PK id; UK username, email</text>
+    <text class="field" x="12" y="81">role, status, must_change_password</text>
+    <text class="field" x="12" y="104">owner/admin identity and access</text>
+  </g>
+  <g transform="translate(350 95)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">stores</text>
+    <text class="field" x="12" y="58">PK id; FK owner_user_id (unique)</text>
+    <text class="field" x="12" y="81">store_name, status</text>
+    <text class="field" x="12" y="104">one owner per store record</text>
+  </g>
+  <g transform="translate(655 95)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">customers</text>
+    <text class="field" x="12" y="58">PK id; FK store_id</text>
+    <text class="field" x="12" y="81">full_name, contact_number, email</text>
+    <text class="field" x="12" y="104">credit_limit, current_balance</text>
+    <text class="field" x="12" y="127">email unique within store if present</text>
+  </g>
+  <g transform="translate(960 95)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">ledger_entries</text>
+    <text class="field" x="12" y="58">PK id; FK customer_id</text>
+    <text class="field" x="12" y="81">kind, amount, dates, running_balance</text>
+    <text class="field" x="12" y="104">itemized_list (JSON), idempotency_key</text>
+    <text class="field" x="12" y="127">optional unique penalty self-reference</text>
+  </g>
+
+  <g transform="translate(45 380)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">store_email_settings</text>
+    <text class="field" x="12" y="58">PK id; unique FK user_id</text>
+    <text class="field" x="12" y="81">store_name, sender_email</text>
+    <text class="field" x="12" y="104">smtp_app_password (encrypted)</text>
+  </g>
+  <g transform="translate(350 380)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">products</text>
+    <text class="field" x="12" y="58">PK id; FK store_id</text>
+    <text class="field" x="12" y="81">name, normalized_name, unit_price</text>
+    <text class="field" x="12" y="104">status; name unique per store</text>
+  </g>
+  <g transform="translate(655 380)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">payments</text>
+    <text class="field" x="12" y="58">PK id; FK customer_id, ledger_entry_id</text>
+    <text class="field" x="12" y="81">amount, kind, payment_date</text>
+    <text class="field" x="12" y="104">payment_batch_id, idempotency_key</text>
+    <text class="field" x="12" y="127">customer/entry composite consistency</text>
+  </g>
+  <g transform="translate(960 380)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">store_penalty_policies</text>
+    <text class="field" x="12" y="58">PK id; unique FK store_id</text>
+    <text class="field" x="12" y="81">is_enabled, fee_cents, grace_days</text>
+    <text class="field" x="12" y="104">effective_from, version, updated_by</text>
+  </g>
+
+  <g transform="translate(45 665)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">purchases</text>
+    <text class="field" x="12" y="58">PK id; FK store_id</text>
+    <text class="field" x="12" y="81">nullable customer_id, ledger_entry_id</text>
+    <text class="field" x="12" y="104">purchase_type, purchase_date</text>
+    <text class="field" x="12" y="127">walk-in cash or credit-linked purchase</text>
+  </g>
+  <g transform="translate(350 665)">
+    <rect class="box" width="255" height="165"/><rect class="head" width="255" height="35"/>
+    <text class="name" x="12" y="24">purchase_items</text>
+    <text class="field" x="12" y="58">PK id; FK purchase_id, product_id</text>
+    <text class="field" x="12" y="81">store_id; unique purchase/product</text>
+    <text class="field" x="12" y="104">product_name_snapshot, quantity</text>
+    <text class="field" x="12" y="127">unit_price_snapshot, line_total</text>
+  </g>
+  <text class="note" x="45" y="906">Users may be referenced for purchases, policy updates, and waivers; a ledger entry may have one unique penalty self-reference.</text>
+  <text class="note" x="45" y="930">Other cardinalities: stores 1:0..* purchases; customers 0..1 per purchase and 1:0..* purchases; ledger entry 0..1:0..1 purchase.</text>
+  <text class="note" x="45" y="954">Composite foreign keys enforce same-customer/store consistency where defined. Cash purchases may have no customer or ledger entry.</text>
+  <text class="note" x="45" y="978">Framework tables, timestamps, and secondary indexes are omitted. Source: database migrations and models.</text>
+  <text class="note" x="45" y="1002">Caption: Figure 4.5(a). Core store, customer, ledger, catalog, and purchase entities.</text>
+</svg>
